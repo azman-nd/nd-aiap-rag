@@ -1,0 +1,11 @@
+[
+    {
+        "id": 3650422497,
+        "name": "rany_openai",
+        "config": {
+            "framework": "raganything",
+            "extractor": "mineru",
+            "modelSource": ""
+        }
+    }
+]
