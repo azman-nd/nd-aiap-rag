@@ -353,9 +353,14 @@ export const deleteScheme = async (schemeId: number): Promise<{ message: string 
 export const queryGraphs = async (
   label: string,
   maxDepth: number,
-  maxNodes: number
+  maxNodes: number,
+  filePath?: string | null
 ): Promise<LightragGraphType> => {
-  const response = await axiosInstance.get(`/graphs?label=${encodeURIComponent(label)}&max_depth=${maxDepth}&max_nodes=${maxNodes}`)
+  let url = `/graphs?label=${encodeURIComponent(label)}&max_depth=${maxDepth}&max_nodes=${maxNodes}`
+  if (filePath && filePath.trim()) {
+    url += `&file_path=${encodeURIComponent(filePath)}`
+  }
+  const response = await axiosInstance.get(url)
   return response.data
 }
 

@@ -47,6 +47,9 @@ interface SettingsState {
   graphLayoutMaxIterations: number
   setGraphLayoutMaxIterations: (iterations: number) => void
 
+  graphFilePathFilter: string | null
+  setGraphFilePathFilter: (filePath: string | null) => void
+
   // Retrieval settings
   queryLabel: string
   setQueryLabel: (queryLabel: string) => void
@@ -98,6 +101,7 @@ const useSettingsStoreBase = create<SettingsState>()(
       graphMaxNodes: 1000,
       backendMaxGraphNodes: null,
       graphLayoutMaxIterations: 15,
+      graphFilePathFilter: null,
 
       queryLabel: defaultQueryLabel,
 
@@ -142,6 +146,11 @@ const useSettingsStoreBase = create<SettingsState>()(
       setGraphLayoutMaxIterations: (iterations: number) =>
         set({
           graphLayoutMaxIterations: iterations
+        }),
+
+      setGraphFilePathFilter: (filePath: string | null) =>
+        set({
+          graphFilePathFilter: filePath
         }),
 
       setQueryLabel: (queryLabel: string) =>

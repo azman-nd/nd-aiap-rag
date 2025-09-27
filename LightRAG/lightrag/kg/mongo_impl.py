@@ -5,7 +5,7 @@ import numpy as np
 import configparser
 import asyncio
 
-from typing import Any, Union, final
+from typing import Any, Union, final, Optional
 
 from ..base import (
     BaseGraphStorage,
@@ -1442,6 +1442,7 @@ class MongoGraphStorage(BaseGraphStorage):
         node_label: str,
         max_depth: int = 3,
         max_nodes: int = None,
+        file_path: Optional[str] = None,
     ) -> KnowledgeGraph:
         """
         Retrieve a connected subgraph of nodes where the label includes the specified `node_label`.
@@ -1450,6 +1451,7 @@ class MongoGraphStorage(BaseGraphStorage):
             node_label: Label of the starting node, * means all nodes
             max_depth: Maximum depth of the subgraph, Defaults to 3
             max_nodes: Maximum nodes to return, Defaults to global_config max_graph_nodes
+            file_path: Optional file path filter (supports partial matching)
 
         Returns:
             KnowledgeGraph object containing nodes and edges, with an is_truncated flag
@@ -1473,6 +1475,10 @@ class MongoGraphStorage(BaseGraphStorage):
         C → B
         C → D
         """
+        # TODO: Implement file_path filtering for MongoDB aggregation pipelines
+        if file_path:
+            logger.warning(f"[{self.workspace}] MongoDB file_path filtering not yet implemented, ignoring filter: {file_path}")
+        
         # Use global_config max_graph_nodes as default if max_nodes is None
         if max_nodes is None:
             max_nodes = self.global_config.get("max_graph_nodes", 1000)

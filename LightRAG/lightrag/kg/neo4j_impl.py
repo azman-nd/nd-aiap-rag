@@ -1,7 +1,7 @@
 import os
 import re
 from dataclasses import dataclass
-from typing import final
+from typing import final, Optional
 import configparser
 
 
@@ -961,6 +961,7 @@ class Neo4JStorage(BaseGraphStorage):
         node_label: str,
         max_depth: int = 3,
         max_nodes: int = None,
+        file_path: Optional[str] = None,
     ) -> KnowledgeGraph:
         """
         Retrieve a connected subgraph of nodes where the label includes the specified `node_label`.
@@ -969,6 +970,7 @@ class Neo4JStorage(BaseGraphStorage):
             node_label: Label of the starting node, * means all nodes
             max_depth: Maximum depth of the subgraph, Defaults to 3
             max_nodes: Maxiumu nodes to return by BFS, Defaults to 1000
+            file_path: Optional file path filter (supports partial matching)
 
         Returns:
             KnowledgeGraph object containing nodes and edges, with an is_truncated flag
@@ -1010,8 +1012,15 @@ class Neo4JStorage(BaseGraphStorage):
                             await count_result.consume()
 
                     # Run main query to get nodes with highest degree
+                    file_path_filter = ""
+                    query_params = {"max_nodes": max_nodes}
+                    if file_path:
+                        file_path_filter = "WHERE n.file_path CONTAINS $file_path"
+                        query_params["file_path"] = file_path
+
                     main_query = f"""
                     MATCH (n:`{workspace_label}`)
+                    {file_path_filter}
                     OPTIONAL MATCH (n)-[r]-()
                     WITH n, COALESCE(count(r), 0) AS degree
                     ORDER BY degree DESC
@@ -1028,7 +1037,7 @@ class Neo4JStorage(BaseGraphStorage):
                     try:
                         result_set = await session.run(
                             main_query,
-                            {"max_nodes": max_nodes},
+                            query_params,
                         )
                         record = await result_set.single()
                     finally:
@@ -1038,9 +1047,18 @@ class Neo4JStorage(BaseGraphStorage):
                 else:
                     # return await self._robust_fallback(node_label, max_depth, max_nodes)
                     # First try without limit to check if we need to truncate
+                    file_path_condition = ""
+                    query_params = {
+                        "entity_id": node_label,
+                        "max_depth": max_depth,
+                    }
+                    if file_path:
+                        file_path_condition = "AND start.file_path CONTAINS $file_path"
+                        query_params["file_path"] = file_path
+
                     full_query = f"""
                     MATCH (start:`{workspace_label}`)
-                    WHERE start.entity_id = $entity_id
+                    WHERE start.entity_id = $entity_id {file_path_condition}
                     WITH start
                     CALL apoc.path.subgraphAll(start, {{
                         relationshipFilter: '',
@@ -1061,10 +1079,7 @@ class Neo4JStorage(BaseGraphStorage):
                     try:
                         full_result = await session.run(
                             full_query,
-                            {
-                                "entity_id": node_label,
-                                "max_depth": max_depth,
-                            },
+                            query_params,
                         )
                         full_record = await full_result.single()
 
@@ -1111,13 +1126,11 @@ class Neo4JStorage(BaseGraphStorage):
                             """
                             result_set = None
                             try:
+                                limited_params = query_params.copy()
+                                limited_params["max_nodes"] = max_nodes
                                 result_set = await session.run(
                                     limited_query,
-                                    {
-                                        "entity_id": node_label,
-                                        "max_depth": max_depth,
-                                        "max_nodes": max_nodes,
-                                    },
+                                    limited_params,
                                 )
                                 record = await result_set.single()
                             finally:

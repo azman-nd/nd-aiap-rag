@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass
-from typing import final
+from typing import final, Optional
 
 from lightrag.types import KnowledgeGraph, KnowledgeGraphNode, KnowledgeGraphEdge
 from lightrag.utils import logger
@@ -217,6 +217,7 @@ class NetworkXStorage(BaseGraphStorage):
         node_label: str,
         max_depth: int = 3,
         max_nodes: int = None,
+        file_path: Optional[str] = None,
     ) -> KnowledgeGraph:
         """
         Retrieve a connected subgraph of nodes where the label includes the specified `node_label`.
@@ -225,6 +226,7 @@ class NetworkXStorage(BaseGraphStorage):
             node_label: Label of the starting node，* means all nodes
             max_depth: Maximum depth of the subgraph, Defaults to 3
             max_nodes: Maxiumu nodes to return by BFS, Defaults to 1000
+            file_path: Optional file path filter (supports partial matching)
 
         Returns:
             KnowledgeGraph object containing nodes and edges, with an is_truncated flag
@@ -327,6 +329,12 @@ class NetworkXStorage(BaseGraphStorage):
                 continue
 
             node_data = dict(subgraph.nodes[node])
+
+            # Apply file_path filtering if specified
+            if file_path:
+                node_file_path = node_data.get("file_path", "")
+                if file_path not in node_file_path:
+                    continue
             # Get entity_type as labels
             labels = []
             if "entity_type" in node_data:
@@ -356,6 +364,12 @@ class NetworkXStorage(BaseGraphStorage):
                 continue
 
             edge_data = dict(subgraph.edges[edge])
+
+            # Apply file_path filtering if specified
+            if file_path:
+                edge_file_path = edge_data.get("file_path", "")
+                if file_path not in edge_file_path:
+                    continue
 
             # Create edge with complete information
             result.edges.append(

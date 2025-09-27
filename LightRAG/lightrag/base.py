@@ -11,6 +11,7 @@ from typing import (
     TypedDict,
     TypeVar,
     Callable,
+    Optional,
 )
 from .utils import EmbeddingFunc
 from .types import KnowledgeGraph
@@ -639,7 +640,7 @@ class BaseGraphStorage(StorageNameSpace, ABC):
 
     @abstractmethod
     async def get_knowledge_graph(
-        self, node_label: str, max_depth: int = 3, max_nodes: int = 1000
+        self, node_label: str, max_depth: int = 3, max_nodes: int = 1000, file_path: Optional[str] = None
     ) -> KnowledgeGraph:
         """
         Retrieve a connected subgraph of nodes where the label includes the specified `node_label`.
@@ -648,6 +649,7 @@ class BaseGraphStorage(StorageNameSpace, ABC):
             node_label: Label of the starting node，* means all nodes
             max_depth: Maximum depth of the subgraph, Defaults to 3
             max_nodes: Maxiumu nodes to return, Defaults to 1000（BFS if possible)
+            file_path: Optional file path filter (supports partial matching)
 
         Returns:
             KnowledgeGraph object containing nodes and edges, with an is_truncated flag
