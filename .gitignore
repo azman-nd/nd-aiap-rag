@@ -77,3 +77,6 @@ memory-bank/
 .claude/
 .cursor/
 CLAUDE.md
+
+# Web UI Build Assets
+LightRAG/lightrag/api/webui/assets/
