@@ -1,7 +1,7 @@
 [
     {
-        "id": 3650422497,
-        "name": "rany_openai",
+        "id": 994712445,
+        "name": "rany_mineru",
         "config": {
             "framework": "raganything",
             "extractor": "mineru",

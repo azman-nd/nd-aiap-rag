@@ -640,7 +640,11 @@ class BaseGraphStorage(StorageNameSpace, ABC):
 
     @abstractmethod
     async def get_knowledge_graph(
-        self, node_label: str, max_depth: int = 3, max_nodes: int = 1000, file_path: Optional[str] = None
+        self,
+        node_label: str,
+        max_depth: int = 3,
+        max_nodes: int = 1000,
+        file_path: Optional[str] = None,
     ) -> KnowledgeGraph:
         """
         Retrieve a connected subgraph of nodes where the label includes the specified `node_label`.

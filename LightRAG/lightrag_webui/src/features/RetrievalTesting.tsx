@@ -2,11 +2,12 @@ import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { throttle } from '@/lib/utils'
-import { queryText, queryTextStream } from '@/api/lightrag'
+import { queryData, queryText, queryTextStream } from '@/api/lightrag'
 import { errorMessage } from '@/lib/utils'
 import { useSettingsStore } from '@/stores/settings'
 import { useDebounce } from '@/hooks/useDebounce'
 import QuerySettings from '@/components/retrieval/QuerySettings'
+import GraphFilterPanel from '@/components/graph/GraphFilterPanel'
 import { ChatMessage, MessageWithError } from '@/components/retrieval/ChatMessage'
 import { EraserIcon, SendIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -268,9 +269,40 @@ export default function RetrievalTesting() {
         ...(modeOverride ? { mode: modeOverride } : {})
       }
 
+      // Use graph metadata filters (same as Knowledge Graph page)
+      // Always read filters fresh from store to avoid stale closures
+      const graphFilters = state.graphMetadataFilters
+      const graphFileFilter = state.graphFilePathFilter
+      
+      // Always send access_filters to ensure consistent filtering
+      // The backend will handle undefined/empty values appropriately
+      queryParams.access_filters = {
+        project_id: (graphFilters.project_id && graphFilters.project_id.trim()) || undefined,
+        owner: (graphFilters.owner && graphFilters.owner.trim()) || undefined,
+        tags: (graphFilters.tags && graphFilters.tags.length > 0) ? graphFilters.tags : undefined,
+        filename: graphFileFilter || undefined
+      }
+
+      // Debug logging to trace filter values being sent
+      console.log('[RetrievalTesting] Submitting query with access_filters:', {
+        project_id: queryParams.access_filters.project_id,
+        owner: queryParams.access_filters.owner,
+        tags: queryParams.access_filters.tags,
+        filename: queryParams.access_filters.filename
+      })
+
       try {
+        const shouldStream = !!(state.querySettings.stream && !queryParams.only_need_context)
+
         // Run query
-        if (state.querySettings.stream) {
+        if (queryParams.only_need_context) {
+          if (state.querySettings.stream) {
+            console.warn('[RetrievalTesting] Stream mode is not supported for /query/data, sending non-streaming request instead.')
+          }
+          const dataResponse = await queryData({ ...queryParams, stream: false })
+          const formatted = JSON.stringify(dataResponse, null, 2)
+          updateAssistantMessage(`Structured retrieval data:\n\`\`\`json\n${formatted}\n\`\`\``)
+        } else if (shouldStream) {
           let errorMessage = ''
           await queryTextStream(queryParams, updateAssistantMessage, (error) => {
             errorMessage += error
@@ -282,7 +314,7 @@ export default function RetrievalTesting() {
             updateAssistantMessage(errorMessage, true)
           }
         } else {
-          const response = await queryText(queryParams)
+          const response = await queryText({ ...queryParams, stream: false })
           updateAssistantMessage(response.response)
         }
       } catch (err) {
@@ -409,6 +441,11 @@ export default function RetrievalTesting() {
     <div className="flex size-full gap-2 px-2 pb-12 overflow-hidden">
       <div className="flex grow flex-col gap-4">
         <div className="relative grow">
+          {/* Doc Filter Button - positioned absolutely in top-right */}
+          <div className="absolute top-2 right-2 z-10">
+            <GraphFilterPanel />
+          </div>
+
           <div
             ref={messagesContainerRef}
             className="bg-primary-foreground/60 absolute inset-0 flex flex-col overflow-auto rounded-lg border p-2"

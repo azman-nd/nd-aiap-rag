@@ -23,10 +23,98 @@ from lightrag.constants import (
     DEFAULT_LOG_MAX_BYTES,
     DEFAULT_LOG_BACKUP_COUNT,
     DEFAULT_LOG_FILENAME,
+    DEFAULT_LOG_INCLUDE_LOCATION,
     GRAPH_FIELD_SEP,
     DEFAULT_MAX_TOTAL_TOKENS,
     DEFAULT_MAX_FILE_PATH_LENGTH,
 )
+
+
+def get_env_value(
+    env_key: str, default: any, value_type: type = str, special_none: bool = False
+) -> any:
+    """
+    Get value from environment variable with type conversion
+
+    Args:
+        env_key (str): Environment variable key
+        default (any): Default value if env variable is not set
+        value_type (type): Type to convert the value to
+        special_none (bool): If True, return None when value is "None"
+
+    Returns:
+        any: Converted value from environment or default
+    """
+    value = os.getenv(env_key)
+    if value is None:
+        return default
+
+    # Handle special case for "None" string
+    if special_none and value == "None":
+        return None
+
+    if value_type is bool:
+        return value.lower() in ("true", "1", "yes", "t", "on")
+
+    # Handle list type with JSON parsing
+    if value_type is list:
+        try:
+            import json
+
+            parsed_value = json.loads(value)
+            # Ensure the parsed value is actually a list
+            if isinstance(parsed_value, list):
+                return parsed_value
+            else:
+                # We can't use logger here yet, so just return default
+                return default
+        except (json.JSONDecodeError, ValueError) as e:
+            # We can't use logger here yet, so just return default
+            return default
+
+    try:
+        return value_type(value)
+    except (ValueError, TypeError):
+        return default
+
+
+def get_log_format(include_location: bool = None) -> str:
+    """Get the appropriate log format based on configuration.
+    
+    Args:
+        include_location: Whether to include filename and function name in logs.
+                         If None, reads from environment variable LOG_INCLUDE_LOCATION.
+    
+    Returns:
+        str: The log format string to use.
+    """
+    if include_location is None:
+        include_location = get_env_value("LOG_INCLUDE_LOCATION", DEFAULT_LOG_INCLUDE_LOCATION, bool)
+    
+    if include_location:
+        return "%(levelname)s - %(filename)s:%(funcName)s:%(lineno)d - %(message)s"
+    else:
+        return "%(levelname)s: %(message)s"
+
+
+def get_detailed_log_format(include_location: bool = None) -> str:
+    """Get the detailed log format (with timestamp) based on configuration.
+    
+    Args:
+        include_location: Whether to include filename and function name in logs.
+                         If None, reads from environment variable LOG_INCLUDE_LOCATION.
+    
+    Returns:
+        str: The detailed log format string to use.
+    """
+    if include_location is None:
+        include_location = get_env_value("LOG_INCLUDE_LOCATION", DEFAULT_LOG_INCLUDE_LOCATION, bool)
+    
+    if include_location:
+        return "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(funcName)s:%(lineno)d - %(message)s"
+    else:
+        return "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
 
 # Initialize logger with basic configuration
 logger = logging.getLogger("lightrag")
@@ -37,7 +125,7 @@ logger.setLevel(logging.INFO)
 if not logger.handlers:
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
-    formatter = logging.Formatter("%(levelname)s: %(message)s")
+    formatter = logging.Formatter(get_log_format())
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
@@ -100,58 +188,6 @@ async def safe_vdb_operation_with_exception(
                 )
                 if retry_delay > 0:
                     await asyncio.sleep(retry_delay)
-
-
-def get_env_value(
-    env_key: str, default: any, value_type: type = str, special_none: bool = False
-) -> any:
-    """
-    Get value from environment variable with type conversion
-
-    Args:
-        env_key (str): Environment variable key
-        default (any): Default value if env variable is not set
-        value_type (type): Type to convert the value to
-        special_none (bool): If True, return None when value is "None"
-
-    Returns:
-        any: Converted value from environment or default
-    """
-    value = os.getenv(env_key)
-    if value is None:
-        return default
-
-    # Handle special case for "None" string
-    if special_none and value == "None":
-        return None
-
-    if value_type is bool:
-        return value.lower() in ("true", "1", "yes", "t", "on")
-
-    # Handle list type with JSON parsing
-    if value_type is list:
-        try:
-            import json
-
-            parsed_value = json.loads(value)
-            # Ensure the parsed value is actually a list
-            if isinstance(parsed_value, list):
-                return parsed_value
-            else:
-                logger.warning(
-                    f"Environment variable {env_key} is not a valid JSON list, using default"
-                )
-                return default
-        except (json.JSONDecodeError, ValueError) as e:
-            logger.warning(
-                f"Failed to parse {env_key} as JSON list: {e}, using default"
-            )
-            return default
-
-    try:
-        return value_type(value)
-    except (ValueError, TypeError):
-        return default
 
 
 # Use TYPE_CHECKING to avoid circular imports
@@ -262,10 +298,8 @@ def setup_logger(
         enable_file_logging: Whether to enable logging to a file (defaults to True)
     """
     # Configure formatters
-    detailed_formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    simple_formatter = logging.Formatter("%(levelname)s: %(message)s")
+    detailed_formatter = logging.Formatter(get_detailed_log_format())
+    simple_formatter = logging.Formatter(get_log_format())
 
     logger_instance = logging.getLogger(logger_name)
     logger_instance.setLevel(level)

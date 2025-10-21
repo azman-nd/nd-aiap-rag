@@ -104,6 +104,24 @@ export type Message = {
   thinkingTime?: number | null
 }
 
+export type MetadataTag = {
+  name: string
+  value?: string
+}
+
+export type ShareEntryPayload = {
+  target_type: 'user' | 'role'
+  permission: 'view' | 'edit'
+  identifier: string
+}
+
+export type AccessFilterPayload = {
+  project_id?: string
+  owner?: string
+  tags?: MetadataTag[]
+  filename?: string
+}
+
 export type QueryRequest = {
   query: string
   /** Specifies the retrieval mode. */
@@ -137,10 +155,19 @@ export type QueryRequest = {
   user_prompt?: string
   /** Enable reranking for retrieved text chunks. If True but no rerank model is configured, a warning will be issued. Default is True. */
   enable_rerank?: boolean
+  /** Metadata-based access filters applied server-side */
+  access_filters?: AccessFilterPayload
 }
 
 export type QueryResponse = {
   response: string
+}
+
+export type QueryDataResponse = {
+  entities: Record<string, any>[]
+  relationships: Record<string, any>[]
+  chunks: Record<string, any>[]
+  metadata: Record<string, any>
 }
 
 export type DocActionResponse = {
@@ -176,6 +203,7 @@ export type DocStatusResponse = {
   metadata?: Record<string, any>
   file_path: string
   scheme_name: string
+  multimodal_content?: any[]
 }
 
 export type DocsStatusesResponse = {
@@ -350,17 +378,92 @@ export const deleteScheme = async (schemeId: number): Promise<{ message: string 
   return response.data;
 };
 
+type GraphQueryOptions = {
+  filePath?: string | null
+  project_id?: string | null
+  owner?: string | null
+  tags?: MetadataTag[]
+}
+
 export const queryGraphs = async (
   label: string,
   maxDepth: number,
   maxNodes: number,
-  filePath?: string | null
+  options?: GraphQueryOptions
 ): Promise<LightragGraphType> => {
-  let url = `/graphs?label=${encodeURIComponent(label)}&max_depth=${maxDepth}&max_nodes=${maxNodes}`
-  if (filePath && filePath.trim()) {
-    url += `&file_path=${encodeURIComponent(filePath)}`
+  const params = new URLSearchParams({
+    label,
+    max_depth: maxDepth.toString(),
+    max_nodes: maxNodes.toString()
+  })
+
+  if (options?.filePath && options.filePath.trim()) {
+    params.append('file_path', options.filePath.trim())
   }
-  const response = await axiosInstance.get(url)
+  if (options?.project_id) {
+    params.append('project_id', options.project_id)
+  }
+  if (options?.owner) {
+    params.append('owner', options.owner)
+  }
+  if (options?.tags && options.tags.length > 0) {
+    params.append('tags', JSON.stringify(options.tags))
+  }
+
+  const response = await axiosInstance.get(`/graphs?${params.toString()}`)
+  return response.data
+}
+
+/**
+ * Get list of accessible document filenames
+ * 
+ * Returns a list of filenames that the current user has access to view,
+ * based on their authentication status and access control rules.
+ * 
+ * @param filters Optional metadata filters to narrow down the list
+ * @returns Array of accessible filenames
+ */
+export const getDocumentsList = async (filters?: AccessFilterPayload): Promise<string[]> => {
+  const params = new URLSearchParams()
+
+  if (filters?.project_id) {
+    params.append('project_id', filters.project_id)
+  }
+  if (filters?.owner) {
+    params.append('owner', filters.owner)
+  }
+  if (filters?.tags && filters.tags.length > 0) {
+    params.append('tags', JSON.stringify(filters.tags))
+  }
+
+  const response = await axiosInstance.get(
+    `/documents/list${params.toString() ? `?${params.toString()}` : ''}`
+  )
+  return response.data
+}
+
+/**
+ * Get list of unique project IDs from accessible documents
+ * 
+ * Returns a list of unique project_id values from documents that the
+ * current user has access to view. Useful for populating project filter dropdowns.
+ * 
+ * @param filters Optional metadata filters (owner, tags) to narrow down the list
+ * @returns Array of unique project IDs
+ */
+export const getProjectsList = async (filters?: Omit<AccessFilterPayload, 'project_id'>): Promise<string[]> => {
+  const params = new URLSearchParams()
+
+  if (filters?.owner) {
+    params.append('owner', filters.owner)
+  }
+  if (filters?.tags && filters.tags.length > 0) {
+    params.append('tags', JSON.stringify(filters.tags))
+  }
+
+  const response = await axiosInstance.get(
+    `/documents/projects${params.toString() ? `?${params.toString()}` : ''}`
+  )
   return response.data
 }
 
@@ -402,6 +505,11 @@ export const getDocumentsScanProgress = async (): Promise<LightragDocumentsScanP
 
 export const queryText = async (request: QueryRequest): Promise<QueryResponse> => {
   const response = await axiosInstance.post('/query', request)
+  return response.data
+}
+
+export const queryData = async (request: QueryRequest): Promise<QueryDataResponse> => {
+  const response = await axiosInstance.post('/query/data', request)
   return response.data
 }
 
@@ -600,14 +708,42 @@ export const insertTexts = async (texts: string[]): Promise<DocActionResponse> =
   return response.data
 }
 
+type UploadDocumentMetadata = {
+  project_id?: string
+  owner?: string
+  is_public?: boolean
+  tags?: MetadataTag[]
+  share?: ShareEntryPayload[]
+}
+
 export const uploadDocument = async (
   file: File,
   schemeId: number | '',
-  onUploadProgress?: (percentCompleted: number) => void
+  onUploadProgress?: (percentCompleted: number) => void,
+  metadata?: UploadDocumentMetadata
 ): Promise<DocActionResponse> => {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('schemeId', schemeId.toString())
+
+  // Add metadata fields if provided
+  if (metadata) {
+    if (metadata.project_id) {
+      formData.append('project_id', metadata.project_id)
+    }
+    if (metadata.owner) {
+      formData.append('owner', metadata.owner)
+    }
+    if (metadata.is_public !== undefined) {
+      formData.append('is_public', metadata.is_public.toString())
+    }
+    if (metadata.tags && metadata.tags.length > 0) {
+      formData.append('tags', JSON.stringify(metadata.tags))
+    }
+    if (metadata.share && metadata.share.length > 0) {
+      formData.append('share', JSON.stringify(metadata.share))
+    }
+  }
 
   const response = await axiosInstance.post('/documents/upload', formData, {
     headers: {
@@ -628,13 +764,14 @@ export const uploadDocument = async (
 export const batchUploadDocuments = async (
   files: File[],
   schemeId: number | '',
-  onUploadProgress?: (fileName: string, percentCompleted: number) => void
+  onUploadProgress?: (fileName: string, percentCompleted: number) => void,
+  metadata?: UploadDocumentMetadata
 ): Promise<DocActionResponse[]> => {
   return await Promise.all(
     files.map(async (file) => {
       return await uploadDocument(file, schemeId, (percentCompleted) => {
         onUploadProgress?.(file.name, percentCompleted)
-      })
+      }, metadata)
     })
   )
 }

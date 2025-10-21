@@ -20,7 +20,8 @@ import PropertiesView from '@/components/graph/PropertiesView'
 import SettingsDisplay from '@/components/graph/SettingsDisplay'
 import Legend from '@/components/graph/Legend'
 import LegendButton from '@/components/graph/LegendButton'
-import FilePathFilter from '@/components/graph/FilePathFilter'
+import GraphFilterPanel from '@/components/graph/GraphFilterPanel'
+import RefreshButton from '@/components/graph/RefreshButton'
 
 import { useSettingsStore } from '@/stores/settings'
 import { useGraphStore } from '@/stores/graph'
@@ -188,15 +189,26 @@ const GraphViewer = () => {
         <FocusOnNode node={autoFocusedNode} move={moveToSelectedNode} />
 
         <div className="absolute top-2 left-2 flex items-start gap-2">
-          <GraphLabels />
-          {showNodeSearchBar && (
-            <GraphSearch
-              value={searchInitSelectedNode}
-              onFocus={onSearchFocus}
-              onChange={onSearchSelect}
-            />
-          )}
-          <FilePathFilter />
+          {/* Doc Filter */}
+          <GraphFilterPanel />
+          
+          {/* Graph Filter Group */}
+          <div className="rounded-lg border-2 border-border bg-background/80 backdrop-blur-sm p-2 flex flex-row flex-wrap items-center gap-2">
+            <div className="text-xs font-medium text-muted-foreground">
+              Graph Filter
+            </div>
+            <GraphLabels />
+            {showNodeSearchBar && (
+              <GraphSearch
+                value={searchInitSelectedNode}
+                onFocus={onSearchFocus}
+                onChange={onSearchSelect}
+              />
+            )}
+          </div>
+          
+          {/* Refresh Button */}
+          <RefreshButton />
         </div>
 
         <div className="bg-background/60 absolute bottom-2 left-2 flex flex-col rounded-xl border-2 backdrop-blur-lg">

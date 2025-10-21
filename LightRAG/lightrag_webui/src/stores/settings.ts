@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { createSelectors } from '@/lib/utils'
 import { defaultQueryLabel } from '@/lib/constants'
-import { Message, QueryRequest } from '@/api/lightrag'
+import { Message, QueryRequest, MetadataTag } from '@/api/lightrag'
 
 type Theme = 'dark' | 'light' | 'system'
 type Language = 'en' | 'zh' | 'fr' | 'ar' | 'zh_TW'
@@ -50,6 +50,13 @@ interface SettingsState {
   graphFilePathFilter: string | null
   setGraphFilePathFilter: (filePath: string | null) => void
 
+  graphMetadataFilters: {
+    project_id?: string
+    owner?: string
+    tags: MetadataTag[]
+  }
+  updateGraphMetadataFilters: (filters: Partial<{ project_id?: string; owner?: string; tags: MetadataTag[] }>) => void
+
   // Retrieval settings
   queryLabel: string
   setQueryLabel: (queryLabel: string) => void
@@ -59,6 +66,12 @@ interface SettingsState {
 
   querySettings: Omit<QueryRequest, 'query'>
   updateQuerySettings: (settings: Partial<QueryRequest>) => void
+  queryAccessFilters: {
+    project_id?: string
+    owner?: string
+    tags: MetadataTag[]
+  }
+  updateQueryAccessFilters: (filters: Partial<{ project_id?: string; owner?: string; tags: MetadataTag[] }>) => void
 
   // Auth settings
   apiKey: string | null
@@ -102,6 +115,9 @@ const useSettingsStoreBase = create<SettingsState>()(
       backendMaxGraphNodes: null,
       graphLayoutMaxIterations: 15,
       graphFilePathFilter: null,
+      graphMetadataFilters: {
+        tags: []
+      },
 
       queryLabel: defaultQueryLabel,
 
@@ -114,6 +130,9 @@ const useSettingsStoreBase = create<SettingsState>()(
       documentsPageSize: 10,
 
       retrievalHistory: [],
+      queryAccessFilters: {
+        tags: []
+      },
 
       querySettings: {
         mode: 'global',
@@ -152,6 +171,19 @@ const useSettingsStoreBase = create<SettingsState>()(
         set({
           graphFilePathFilter: filePath
         }),
+
+      updateGraphMetadataFilters: (filters) => {
+        const newFilters = {
+          project_id: filters.project_id !== undefined ? (filters.project_id || undefined) : useSettingsStore.getState().graphMetadataFilters.project_id,
+          owner: filters.owner !== undefined ? (filters.owner || undefined) : useSettingsStore.getState().graphMetadataFilters.owner,
+          tags: filters.tags !== undefined ? filters.tags : useSettingsStore.getState().graphMetadataFilters.tags
+        }
+        console.log('[useSettingsStore] Updating graphMetadataFilters:', {
+          input: filters,
+          result: newFilters
+        })
+        set({ graphMetadataFilters: newFilters })
+      },
 
       setQueryLabel: (queryLabel: string) =>
         set({
@@ -202,6 +234,15 @@ const useSettingsStoreBase = create<SettingsState>()(
           querySettings: { ...state.querySettings, ...filteredSettings, history_turns: 0 }
         }))
       },
+
+      updateQueryAccessFilters: (filters) =>
+        set((state) => ({
+          queryAccessFilters: {
+            project_id: filters.project_id !== undefined ? (filters.project_id || undefined) : state.queryAccessFilters.project_id,
+            owner: filters.owner !== undefined ? (filters.owner || undefined) : state.queryAccessFilters.owner,
+            tags: filters.tags !== undefined ? filters.tags : state.queryAccessFilters.tags
+          }
+        })),
 
       setShowFileName: (show: boolean) => set({ showFileName: show }),
       setShowLegend: (show: boolean) => set({ showLegend: show }),

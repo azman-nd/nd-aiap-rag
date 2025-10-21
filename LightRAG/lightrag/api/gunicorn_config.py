@@ -2,7 +2,7 @@
 import os
 import logging
 from lightrag.kg.shared_storage import finalize_share_data
-from lightrag.utils import setup_logger, get_env_value
+from lightrag.utils import setup_logger, get_env_value, get_detailed_log_format
 from lightrag.constants import (
     DEFAULT_LOG_MAX_BYTES,
     DEFAULT_LOG_BACKUP_COUNT,
@@ -44,7 +44,7 @@ logconfig_dict = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "standard": {"format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"},
+        "standard": {"format": get_detailed_log_format().replace("%(asctime)s - %(name)s - %(levelname)s - ", "%(asctime)s [%(levelname)s] %(name)s - ")},
     },
     "handlers": {
         "console": {

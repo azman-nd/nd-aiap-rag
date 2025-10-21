@@ -10,6 +10,7 @@ import {
   DialogTrigger
 } from '@/components/ui/Dialog'
 import FileUploader from '@/components/ui/FileUploader'
+import UploadMetadataForm, { UploadMetadata } from './UploadMetadataForm'
 import { toast } from 'sonner'
 import { errorMessage } from '@/lib/utils'
 import { uploadDocument } from '@/api/lightrag'
@@ -28,6 +29,13 @@ export default function UploadDocumentsDialog({ onDocumentsUploaded }: UploadDoc
   const [isUploading, setIsUploading] = useState(false)
   const [progresses, setProgresses] = useState<Record<string, number>>({})
   const [fileErrors, setFileErrors] = useState<Record<string, string>>({})
+  const [metadata, setMetadata] = useState<UploadMetadata>({
+    project_id: '',
+    owner: '',
+    is_public: true,
+    tags: [],
+    share: []
+  })
   const { selectedScheme } = useScheme();
 
   const handleRejectedFiles = useCallback(
@@ -104,11 +112,11 @@ export default function UploadDocumentsDialog({ onDocumentsUploaded }: UploadDoc
 
             const result = await uploadDocument(file, selectedScheme?.id, (percentCompleted: number) => {
               console.debug(t('documentPanel.uploadDocuments.single.uploading', { name: file.name, percent: percentCompleted }))
-              setProgresses((pre) => ({
-                ...pre,
-                [file.name]: percentCompleted
-              }))
-            })
+        setProgresses((pre) => ({
+          ...pre,
+          [file.name]: percentCompleted
+        }))
+            }, metadata)
 
             if (result.status === 'duplicated') {
               uploadErrors[file.name] = t('documentPanel.uploadDocuments.fileUploader.duplicateFile')
@@ -195,6 +203,13 @@ export default function UploadDocumentsDialog({ onDocumentsUploaded }: UploadDoc
         if (!open) {
           setProgresses({})
           setFileErrors({})
+          setMetadata({
+            project_id: '',
+            owner: '',
+            is_public: true,
+            tags: [],
+            share: []
+          })
         }
         setOpen(open)
       }}
@@ -204,7 +219,7 @@ export default function UploadDocumentsDialog({ onDocumentsUploaded }: UploadDoc
           <UploadIcon /> {t('documentPanel.uploadDocuments.button')}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-xl" onCloseAutoFocus={(e) => e.preventDefault()}>
+      <DialogContent className="sm:max-w-2xl" onCloseAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>{t('documentPanel.uploadDocuments.title')}</DialogTitle>
           <DialogDescription>
@@ -215,16 +230,28 @@ export default function UploadDocumentsDialog({ onDocumentsUploaded }: UploadDoc
             )}
           </DialogDescription>
         </DialogHeader>
-        <FileUploader
-          maxFileCount={Infinity}
-          maxSize={200 * 1024 * 1024}
-          description={t('documentPanel.uploadDocuments.fileTypes')}
-          onUpload={handleDocumentsUpload}
-          onReject={handleRejectedFiles}
-          progresses={progresses}
-          fileErrors={fileErrors}
-          disabled={isUploading}
-        />
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-sm font-medium mb-3">{t('documentPanel.uploadDocuments.metadata.title')}</h3>
+            <UploadMetadataForm
+              metadata={metadata}
+              onChange={setMetadata}
+            />
+          </div>
+          <div>
+            <h3 className="text-sm font-medium mb-3">{t('documentPanel.uploadDocuments.files.title')}</h3>
+            <FileUploader
+              maxFileCount={Infinity}
+              maxSize={200 * 1024 * 1024}
+              description={t('documentPanel.uploadDocuments.fileTypes')}
+              onUpload={handleDocumentsUpload}
+              onReject={handleRejectedFiles}
+              progresses={progresses}
+              fileErrors={fileErrors}
+              disabled={isUploading}
+            />
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   )

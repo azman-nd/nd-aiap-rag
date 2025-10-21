@@ -109,6 +109,31 @@
         "removeFile": "Remove file",
         "uploadDescription": "You can upload {{isMultiple ? 'multiple' : count}} files (up to {{maxSize}} each)",
         "duplicateFile": "File name already exists in server cache"
+      },
+      "metadata": {
+        "title": "Document Metadata",
+        "projectId": "Project ID",
+        "projectIdPlaceholder": "Enter project identifier (optional)",
+        "ownerLabel": "Owner User ID",
+        "ownerPlaceholder": "Defaults to the authenticated user",
+        "ownerHelper": "Leave blank to use the authenticated user as the owner.",
+        "isPublic": "Make documents public",
+        "tags": "Tags",
+        "tagNamePlaceholder": "Tag name",
+        "tagValuePlaceholder": "Tag value (optional)",
+        "tagsHelper": "Tags are key/value pairs applied to the document.",
+        "share": "Share With",
+        "shareTargetPlaceholder": "Target",
+        "shareTargetUser": "User",
+        "shareTargetRole": "Role",
+        "sharePermissionPlaceholder": "Permission",
+        "sharePermissionView": "View",
+        "sharePermissionEdit": "Edit",
+        "shareIdentifierPlaceholder": "Identifier (user ID or role)",
+        "shareHelper": "Entries follow target:permission:identifier format. Edit access implies view."
+      },
+      "files": {
+        "title": "Files"
       }
     },
     "documentManager": {
@@ -125,11 +150,15 @@
       "columns": {
         "id": "ID",
         "fileName": "File Name",
+        "projectId": "Project ID",
         "summary": "Summary",
         "handler": "Handler",
         "status": "Status",
         "length": "Length",
         "chunks": "Chunks",
+        "nodes": "Nodes",
+        "edges": "Edges",
+        "multimodal": "MM",
         "created": "Created",
         "updated": "Updated",
         "metadata": "Metadata",
@@ -178,6 +207,25 @@
       "description": "View current system status and connection information"
     },
     "legend": "Legend",
+    "filters": {
+      "title": "Knowledge Graph Filters",
+      "metadataSummary": "Metadata filters applied",
+      "activeFiltersTooltip": "Metadata filters active",
+      "openFiltersTooltip": "Filter knowledge graph",
+      "project": "Project ID",
+      "projectPlaceholder": "e.g. finance_2025",
+      "owner": "Owner User ID",
+      "ownerPlaceholder": "user@example.com",
+      "tags": "Tags",
+      "tagNamePlaceholder": "name",
+      "tagValuePlaceholder": "value (optional)",
+      "tagsHelper": "Match documents containing all listed tags.",
+      "filePath": "File Path (optional)",
+      "filePathPlaceholder": "document.pdf",
+      "filePathHelper": "Supports partial matching. Leave empty to show all files.",
+      "apply": "Apply",
+      "clear": "Clear"
+    },
     "nodeTypes": {
       "person": "Person",
       "category": "Category",
@@ -406,7 +454,18 @@
       "userPromptTooltip": "Provide additional response requirements to the LLM (unrelated to query content, only for output processing).",
       "userPromptPlaceholder": "Enter custom prompt (optional)",
       "enableRerank": "Enable Rerank",
-      "enableRerankTooltip": "Enable reranking for retrieved text chunks. If True but no rerank model is configured, a warning will be issued. Default is True."
+      "enableRerankTooltip": "Enable reranking for retrieved text chunks. If True but no rerank model is configured, a warning will be issued. Default is True.",
+      "metadataFilters": {
+        "title": "Metadata Filters",
+        "project": "Project ID",
+        "projectPlaceholder": "e.g. finance_2025",
+        "owner": "Owner User ID",
+        "ownerPlaceholder": "user@example.com",
+        "tags": "Tags",
+        "tagNamePlaceholder": "name",
+        "tagValuePlaceholder": "value (optional)",
+        "helper": "Filters are sent with every retrieval call to scope accessible documents."
+      }
     }
   },
   "apiSite": {

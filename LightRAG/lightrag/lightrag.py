@@ -6,6 +6,7 @@ import configparser
 import os
 import time
 import warnings
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from functools import partial
@@ -924,6 +925,7 @@ class LightRAG:
         file_paths: str | list[str] | None = None,
         track_id: str | None = None,
         scheme_name: str | None = None,
+        metadata: dict[str, Any] | list[dict[str, Any]] | None = None,
     ) -> str:
         """Async Insert documents with checkpoint support
 
@@ -939,6 +941,7 @@ class LightRAG:
             file_paths: list of file paths corresponding to each document, used for citation
             track_id: tracking ID for monitoring processing status, if not provided, will be generated
             scheme_name (str | None, optional): Scheme name for categorizing documents
+            metadata (dict[str, Any] | list[dict[str, Any]] | None, optional): Document metadata including access control information
 
         Returns:
             str: tracking ID for monitoring processing status
@@ -961,6 +964,7 @@ class LightRAG:
             file_paths,
             track_id,
             scheme_name=scheme_name,
+            metadata=metadata,
         )
 
         for file_path in paths_to_check:
@@ -1106,6 +1110,9 @@ class LightRAG:
         file_paths: str | list[str] | None = None,
         track_id: str | None = None,
         scheme_name: str | None = None,
+        metadata: dict[str, Any]
+        | list[dict[str, Any]]
+        | None = None,
     ) -> str:
         """
         Pipeline for Processing Documents
@@ -1149,7 +1156,24 @@ class LightRAG:
             # If no file paths provided, use placeholder
             file_paths = ["unknown_source"] * len(input)
 
+        num_docs = len(input)
+        if metadata is None:
+            metadata_list: list[dict[str, Any] | None] = [None] * num_docs
+        else:
+            if isinstance(metadata, list):
+                if len(metadata) != num_docs:
+                    raise ValueError(
+                        "Number of metadata entries must match the number of documents"
+                    )
+                metadata_list = [
+                    deepcopy(item) if item is not None else None for item in metadata
+                ]
+            else:
+                metadata_list = [deepcopy(metadata) for _ in range(num_docs)]
+
         # 1. Validate ids if provided or generate MD5 hash IDs and remove duplicate contents
+        metadata_map: dict[str, dict[str, Any] | None] = {}
+
         if ids is not None:
             # Check if the number of IDs matches the number of documents
             if len(ids) != len(input):
@@ -1161,32 +1185,30 @@ class LightRAG:
 
             # Generate contents dict and remove duplicates in one pass
             unique_contents = {}
-            for id_, doc, path in zip(ids, input, file_paths):
+            for id_, doc, path, meta in zip(ids, input, file_paths, metadata_list):
                 cleaned_content = sanitize_text_for_encoding(doc)
                 if cleaned_content not in unique_contents:
-                    unique_contents[cleaned_content] = (id_, path)
+                    unique_contents[cleaned_content] = (id_, path, meta)
 
             # Reconstruct contents with unique content
-            contents = {
-                id_: {"content": content, "file_path": file_path}
-                for content, (id_, file_path) in unique_contents.items()
-            }
+            contents = {}
+            for content, (id_, file_path, meta) in unique_contents.items():
+                contents[id_] = {"content": content, "file_path": file_path}
+                metadata_map[id_] = meta
         else:
             # Clean input text and remove duplicates in one pass
-            unique_content_with_paths = {}
-            for doc, path in zip(input, file_paths):
+            unique_content_with_info = {}
+            for doc, path, meta in zip(input, file_paths, metadata_list):
                 cleaned_content = sanitize_text_for_encoding(doc)
-                if cleaned_content not in unique_content_with_paths:
-                    unique_content_with_paths[cleaned_content] = path
+                if cleaned_content not in unique_content_with_info:
+                    unique_content_with_info[cleaned_content] = (path, meta)
 
             # Generate contents dict of MD5 hash IDs and documents with paths
-            contents = {
-                compute_mdhash_id(content, prefix="doc-"): {
-                    "content": content,
-                    "file_path": path,
-                }
-                for content, path in unique_content_with_paths.items()
-            }
+            contents = {}
+            for content, (path, meta) in unique_content_with_info.items():
+                doc_id = compute_mdhash_id(content, prefix="doc-")
+                contents[doc_id] = {"content": content, "file_path": path}
+                metadata_map[doc_id] = meta
 
         # 2. Generate document initial status (without content)
         new_docs: dict[str, Any] = {
@@ -1202,6 +1224,7 @@ class LightRAG:
                 ],  # Store file path in document status
                 "track_id": track_id,  # Store track_id in document status
                 "scheme_name": scheme_name,
+                "metadata": deepcopy(metadata_map.get(id_) or {}),
             }
             for id_, content_data in contents.items()
         }
@@ -1659,8 +1682,19 @@ class LightRAG:
                             if not chunks:
                                 logger.warning("No document chunks to process")
 
-                            # Record processing start time
+                            # Record processing start time and preserve existing metadata
                             processing_start_time = int(time.time())
+                            existing_metadata = {}
+                            try:
+                                existing_metadata = status_doc.metadata or {}
+                            except AttributeError:
+                                existing_metadata = {}
+                            processing_metadata = {
+                                **existing_metadata,
+                                "processing_start_time": existing_metadata.get(
+                                    "processing_start_time", processing_start_time
+                                ),
+                            }
 
                             # Process document in two stages
                             # Stage 1: Process text chunks and docs (parallel execution)
@@ -1682,9 +1716,7 @@ class LightRAG:
                                             ).isoformat(),
                                             "file_path": file_path,
                                             "track_id": status_doc.track_id,  # Preserve existing track_id
-                                            "metadata": {
-                                                "processing_start_time": processing_start_time
-                                            },
+                                            "metadata": processing_metadata,
                                             "scheme_name": status_doc.scheme_name,
                                         }
                                     }
@@ -1743,6 +1775,18 @@ class LightRAG:
 
                             # Record processing end time for failed case
                             processing_end_time = int(time.time())
+                            existing_metadata = {}
+                            try:
+                                existing_metadata = status_doc.metadata or {}
+                            except AttributeError:
+                                existing_metadata = {}
+                            failure_metadata = {
+                                **existing_metadata,
+                                "processing_start_time": existing_metadata.get(
+                                    "processing_start_time", processing_start_time
+                                ),
+                                "processing_end_time": processing_end_time,
+                            }
 
                             # Update document status to failed
                             await self.doc_status.upsert(
@@ -1759,10 +1803,7 @@ class LightRAG:
                                         ).isoformat(),
                                         "file_path": file_path,
                                         "track_id": status_doc.track_id,  # Preserve existing track_id
-                                        "metadata": {
-                                            "processing_start_time": processing_start_time,
-                                            "processing_end_time": processing_end_time,
-                                        },
+                                        "metadata": failure_metadata,
                                         "scheme_name": status_doc.scheme_name,
                                     }
                                 }
@@ -1792,6 +1833,18 @@ class LightRAG:
 
                                 # Record processing end time
                                 processing_end_time = int(time.time())
+                                existing_metadata = {}
+                                try:
+                                    existing_metadata = status_doc.metadata or {}
+                                except AttributeError:
+                                    existing_metadata = {}
+                                failure_metadata = {
+                                    **existing_metadata,
+                                    "processing_start_time": existing_metadata.get(
+                                        "processing_start_time", processing_start_time
+                                    ),
+                                    "processing_end_time": processing_end_time,
+                                }
 
                                 await self.doc_status.upsert(
                                     {
@@ -1808,10 +1861,7 @@ class LightRAG:
                                             ).isoformat(),
                                             "file_path": file_path,
                                             "track_id": status_doc.track_id,  # Preserve existing track_id
-                                            "metadata": {
-                                                "processing_start_time": processing_start_time,
-                                                "processing_end_time": processing_end_time,
-                                            },
+                                            "metadata": failure_metadata,
                                             "scheme_name": status_doc.scheme_name,
                                         }
                                     }
@@ -1833,11 +1883,36 @@ class LightRAG:
                                 current_doc_status = await self.doc_status.get_by_id(
                                     doc_id
                                 )
+                                
+                                # Get nodes and edges counts for this document
+                                nodes_count = 0
+                                edges_count = 0
+                                try:
+                                    if self.full_entities:
+                                        entities_data = await self.full_entities.get_by_id(doc_id)
+                                        if entities_data:
+                                            nodes_count = entities_data.get("count", 0)
+                                    
+                                    if self.full_relations:
+                                        relations_data = await self.full_relations.get_by_id(doc_id)
+                                        if relations_data:
+                                            edges_count = relations_data.get("count", 0)
+                                except Exception as e:
+                                    logger.warning(f"Could not retrieve graph counts for {doc_id}: {e}")
+                                
+                                # Update metadata with graph counts
+                                updated_metadata = {
+                                    **(current_doc_status.get("metadata") or {}),
+                                    "nodes_count": nodes_count,
+                                    "edges_count": edges_count,
+                                }
+                                
                                 await self.doc_status.upsert(
                                     {
                                         doc_id: {
                                             **current_doc_status,
                                             "status": DocStatus.PROCESSED,
+                                            "metadata": updated_metadata,
                                         }
                                     }
                                 )

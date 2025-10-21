@@ -5,7 +5,7 @@ import { errorMessage } from '@/lib/utils'
 import * as Constants from '@/lib/constants'
 import { useGraphStore, RawGraph, RawNodeType, RawEdgeType } from '@/stores/graph'
 import { toast } from 'sonner'
-import { queryGraphs } from '@/api/lightrag'
+import { queryGraphs, MetadataTag } from '@/api/lightrag'
 import { useBackendState } from '@/stores/state'
 import { useSettingsStore } from '@/stores/settings'
 
@@ -222,7 +222,13 @@ export type EdgeType = {
   hidden?: boolean
 }
 
-const fetchGraph = async (label: string, maxDepth: number, maxNodes: number, filePath?: string | null) => {
+const fetchGraph = async (
+  label: string,
+  maxDepth: number,
+  maxNodes: number,
+  filePath?: string | null,
+  metadataFilters?: { project_id?: string; owner?: string; tags?: MetadataTag[] }
+) => {
   let rawData: any = null;
 
   // Check if we need to fetch all database labels first
@@ -245,8 +251,15 @@ const fetchGraph = async (label: string, maxDepth: number, maxNodes: number, fil
   const queryLabel = label || '*';
 
   try {
-    console.log(`Fetching graph label: ${queryLabel}, depth: ${maxDepth}, nodes: ${maxNodes}, filePath: ${filePath}`);
-    rawData = await queryGraphs(queryLabel, maxDepth, maxNodes, filePath);
+    console.log(
+      `Fetching graph label: ${queryLabel}, depth: ${maxDepth}, nodes: ${maxNodes}, filePath: ${filePath}, project: ${metadataFilters?.project_id}, owner: ${metadataFilters?.owner}`
+    );
+    rawData = await queryGraphs(queryLabel, maxDepth, maxNodes, {
+      filePath,
+      project_id: metadataFilters?.project_id || null,
+      owner: metadataFilters?.owner || null,
+      tags: metadataFilters?.tags
+    });
   } catch (e) {
     useBackendState.getState().setErrorMessage(errorMessage(e), 'Query Graphs Error!');
     return null;
@@ -409,6 +422,7 @@ const useLightrangeGraph = () => {
   const maxQueryDepth = useSettingsStore.use.graphQueryMaxDepth()
   const maxNodes = useSettingsStore.use.graphMaxNodes()
   const graphFilePathFilter = useSettingsStore.use.graphFilePathFilter()
+  const graphMetadataFilters = useSettingsStore.use.graphMetadataFilters()
   const isFetching = useGraphStore.use.isFetching()
   const nodeToExpand = useGraphStore.use.nodeToExpand()
   const nodeToPrune = useGraphStore.use.nodeToPrune()
@@ -491,7 +505,13 @@ const useLightrangeGraph = () => {
 
       // 1. If query label is not empty, use fetchGraph
       if (currentQueryLabel) {
-        dataPromise = fetchGraph(currentQueryLabel, currentMaxQueryDepth, currentMaxNodes, graphFilePathFilter);
+        dataPromise = fetchGraph(
+          currentQueryLabel,
+          currentMaxQueryDepth,
+          currentMaxNodes,
+          graphFilePathFilter,
+          graphMetadataFilters
+        );
       } else {
         // 2. If query label is empty, set data to null
         console.log('Query label is empty, show empty graph')
@@ -621,7 +641,12 @@ const useLightrangeGraph = () => {
         }
 
         // Fetch the extended subgraph with depth 2
-        const extendedGraph = await queryGraphs(label, 2, 1000, graphFilePathFilter);
+        const extendedGraph = await queryGraphs(label, 2, 1000, {
+          filePath: graphFilePathFilter,
+          project_id: graphMetadataFilters.project_id || null,
+          owner: graphMetadataFilters.owner || null,
+          tags: graphMetadataFilters.tags
+        });
 
         if (!extendedGraph || !extendedGraph.nodes || !extendedGraph.edges) {
           console.error('Failed to fetch extended graph');

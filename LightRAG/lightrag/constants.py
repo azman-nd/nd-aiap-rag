@@ -80,6 +80,7 @@ DEFAULT_EMBEDDING_TIMEOUT = 30
 DEFAULT_LOG_MAX_BYTES = 10485760  # Default 10MB
 DEFAULT_LOG_BACKUP_COUNT = 5  # Default 5 backups
 DEFAULT_LOG_FILENAME = "lightrag.log"  # Default log filename
+DEFAULT_LOG_INCLUDE_LOCATION = True  # Default to include filename and function name in logs
 
 # Ollama server configuration defaults
 DEFAULT_OLLAMA_MODEL_NAME = "lightrag"

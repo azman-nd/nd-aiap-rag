@@ -113,6 +113,7 @@ export default function QuerySettings() {
               </div>
             </>
 
+
             {/* Response Format */}
             <>
               <TooltipProvider>

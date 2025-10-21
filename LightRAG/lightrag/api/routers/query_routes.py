@@ -7,13 +7,69 @@ import logging
 from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from lightrag.base import QueryParam
+from lightrag.utils import logger
 from ..utils_api import get_combined_auth_dependency
+from ..access_control import (
+    AccessFilters,
+    CurrentUser,
+    Permission,
+    doc_file_path,
+    filter_chunks_by_access,
+    filter_entities_by_access,
+    get_current_user_optional,
+    get_user_accessible_files,
+    normalize_tag_items,
+    query_with_access_control,
+)
 from pydantic import BaseModel, Field, field_validator
 
 from ascii_colors import trace_exception
 
 router = APIRouter(tags=["query"])
+
+
+class TagFilter(BaseModel):
+    """Tag filter for metadata-based access control."""
+
+    name: str = Field(..., description="Tag name to match")
+    value: Optional[str] = Field(default="", description="Tag value to match")
+
+    @field_validator("name", mode="after")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Tag name cannot be empty")
+        return value
+
+    @field_validator("value", mode="after")
+    @classmethod
+    def normalize_value(cls, value: Optional[str]) -> Optional[str]:
+        return value.strip() if isinstance(value, str) else value
+
+
+class AccessFilterPayload(BaseModel):
+    """Metadata filters provided by the client to scope query results."""
+
+    project_id: Optional[str] = Field(
+        default=None, description="Project identifier used to scope accessible documents"
+    )
+    owner: Optional[str] = Field(
+        default=None, description="Owner user id used to scope accessible documents"
+    )
+    tags: Optional[List[TagFilter]] = Field(
+        default=None, description="List of tags (name/value pairs) that documents must contain"
+    )
+    filename: Optional[str] = Field(
+        default=None, description="Filter by document filename (supports partial matching)"
+    )
+
+    @field_validator("project_id", "owner", "filename", mode="after")
+    @classmethod
+    def strip_strings(cls, value: Optional[str]) -> Optional[str]:
+        return value.strip() if isinstance(value, str) else value
 
 
 class QueryRequest(BaseModel):
@@ -98,6 +154,11 @@ class QueryRequest(BaseModel):
         description="Enable reranking for retrieved text chunks. If True but no rerank model is configured, a warning will be issued. Default is True.",
     )
 
+    access_filters: Optional[AccessFilterPayload] = Field(
+        default=None,
+        description="Metadata filters (project/owner/tags) applied before executing the query",
+    )
+
     @field_validator("query", mode="after")
     @classmethod
     def query_strip_after(cls, query: str) -> str:
@@ -120,12 +181,35 @@ class QueryRequest(BaseModel):
     def to_query_params(self, is_stream: bool) -> "QueryParam":
         """Converts a QueryRequest instance into a QueryParam instance."""
         # Use Pydantic's `.model_dump(exclude_none=True)` to remove None values automatically
-        request_data = self.model_dump(exclude_none=True, exclude={"query"})
+        request_data = self.model_dump(
+            exclude_none=True,
+            exclude={"query", "access_filters"},
+        )
 
         # Ensure `mode` and `stream` are set explicitly
         param = QueryParam(**request_data)
         param.stream = is_stream
         return param
+
+
+def build_access_filters(payload: AccessFilterPayload | None) -> AccessFilters:
+    """Convert request payload into AccessFilters used by access control layer."""
+
+    if payload is None:
+        return AccessFilters()
+
+    tags_payload = (
+        [tag.model_dump() for tag in payload.tags]
+        if payload.tags
+        else None
+    )
+    tags = normalize_tag_items(tags_payload)
+    return AccessFilters(
+        project_id=payload.project_id,
+        owner=payload.owner,
+        tags=tags,
+        filename=payload.filename,
+    )
 
 
 class QueryResponse(BaseModel):
@@ -152,10 +236,30 @@ class QueryDataResponse(BaseModel):
 def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
     combined_auth = get_combined_auth_dependency(api_key)
 
+    def apply_doc_id_filter(param: QueryParam, accessible_docs: dict[str, Any]) -> bool:
+        """
+        Limit QueryParam.ids to documents the caller can access.
+
+        Returns:
+            bool: True if any accessible document IDs remain after filtering.
+        """
+        accessible_ids = list(accessible_docs.keys())
+
+        if param.ids:
+            filtered_ids = [doc_id for doc_id in param.ids if doc_id in accessible_docs]
+            param.ids = filtered_ids
+            return len(filtered_ids) > 0
+
+        param.ids = accessible_ids
+        return len(accessible_ids) > 0
+
     @router.post(
         "/query", response_model=QueryResponse, dependencies=[Depends(combined_auth)]
     )
-    async def query_text(request: QueryRequest):
+    async def query_text(
+        request: QueryRequest,
+        current_user: CurrentUser = Depends(get_current_user_optional),
+    ):
         """
         Handle a POST request at the /query endpoint to process user queries using RAG capabilities.
 
@@ -172,23 +276,101 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
         """
         try:
             param = request.to_query_params(False)
+            filters = build_access_filters(request.access_filters)
+
+            # When the caller only needs context, leverage the dedicated helper
+            if request.only_need_context:
+                context_result = await query_with_access_control(
+                    rag=rag,
+                    query=request.query,
+                    current_user=current_user,
+                    param=param,
+                    filters=filters,
+                )
+                return QueryResponse(response=json.dumps(context_result, indent=2))
+
+            accessible_docs = await get_user_accessible_files(
+                rag.doc_status,
+                current_user,
+                project_id=filters.project_id,
+                include_shared=True,
+                include_public=True,
+                filters=filters,
+                required_permission=Permission.VIEW,
+            )
+            
+            # Apply filename filter if provided (post-filter accessible docs)
+            if filters.filename:
+                accessible_docs = {
+                    doc_id: status for doc_id, status in accessible_docs.items()
+                    if filters.filename in (doc_file_path(status) or '')
+                }
+
+            if not accessible_docs:
+                detail = (
+                    "No accessible documents found for the provided metadata filters."
+                    if current_user.is_authenticated
+                    else "Please authenticate or provide appropriate metadata to access documents."
+                )
+                return QueryResponse(response=detail)
+
+            if not apply_doc_id_filter(param, accessible_docs):
+                detail = (
+                    "No accessible documents found for the provided metadata filters."
+                    if current_user.is_authenticated
+                    else "Please authenticate or provide appropriate metadata to access documents."
+                )
+                return QueryResponse(response=detail)
+
             response = await rag.aquery(request.query, param=param)
 
-            # If response is a string (e.g. cache hit), return directly
+            if isinstance(response, dict):
+                filtered_chunks = await filter_chunks_by_access(
+                    response.get("chunks", []),
+                    accessible_docs,
+                )
+                filtered_entities = await filter_entities_by_access(
+                    response.get("entities", []),
+                    accessible_docs,
+                )
+                filtered_relationships = await filter_entities_by_access(
+                    response.get("relationships", []),
+                    accessible_docs,
+                )
+
+                response["chunks"] = filtered_chunks
+                response["entities"] = filtered_entities
+                response["relationships"] = filtered_relationships
+
+                metadata = response.get("metadata") or {}
+                accessible_paths = [
+                    path for path in (doc_file_path(status) for status in accessible_docs.values()) if path
+                ]
+                metadata.update(
+                    {
+                        "accessible_files": accessible_paths,
+                        "total_accessible_files": len(accessible_docs),
+                        "applied_filters": filters.__dict__,
+                    }
+                )
+                response["metadata"] = metadata
+
+                result = json.dumps(response, indent=2)
+                return QueryResponse(response=result)
+
             if isinstance(response, str):
                 return QueryResponse(response=response)
 
-            if isinstance(response, dict):
-                result = json.dumps(response, indent=2)
-                return QueryResponse(response=result)
-            else:
-                return QueryResponse(response=str(response))
+            return QueryResponse(response=str(response))
         except Exception as e:
             trace_exception(e)
             raise HTTPException(status_code=500, detail=str(e))
 
     @router.post("/query/stream", dependencies=[Depends(combined_auth)])
-    async def query_text_stream(request: QueryRequest):
+    async def query_text_stream(
+        request: QueryRequest,
+        current_user: CurrentUser = Depends(get_current_user_optional),
+    ):
         """
         This endpoint performs a retrieval-augmented generation (RAG) query and streams the response.
 
@@ -201,9 +383,61 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
         """
         try:
             param = request.to_query_params(True)
-            response = await rag.aquery(request.query, param=param)
+            filters = build_access_filters(request.access_filters)
 
-            from fastapi.responses import StreamingResponse
+            if request.only_need_context:
+                context_result = await query_with_access_control(
+                    rag=rag,
+                    query=request.query,
+                    current_user=current_user,
+                    param=param,
+                    filters=filters,
+                )
+
+                async def single_payload():
+                    yield f"{json.dumps(context_result)}\n"
+
+                return StreamingResponse(
+                    single_payload(),
+                    media_type="application/x-ndjson",
+                    headers={
+                        "Cache-Control": "no-cache",
+                        "Connection": "keep-alive",
+                        "Content-Type": "application/x-ndjson",
+                        "X-Accel-Buffering": "no",
+                    },
+                )
+
+            accessible_docs = await get_user_accessible_files(
+                rag.doc_status,
+                current_user,
+                project_id=filters.project_id,
+                include_shared=True,
+                include_public=True,
+                filters=filters,
+                required_permission=Permission.VIEW,
+            )
+            
+            # Apply filename filter if provided (post-filter accessible docs)
+            if filters.filename:
+                accessible_docs = {
+                    doc_id: status for doc_id, status in accessible_docs.items()
+                    if filters.filename in (doc_file_path(status) or '')
+                }
+
+            if not accessible_docs:
+                raise HTTPException(
+                    status_code=403,
+                    detail="No accessible documents found for the provided metadata filters.",
+                )
+
+            if not apply_doc_id_filter(param, accessible_docs):
+                raise HTTPException(
+                    status_code=403,
+                    detail="No accessible documents found for the provided metadata filters.",
+                )
+
+            response = await rag.aquery(request.query, param=param)
 
             async def stream_generator():
                 if isinstance(response, str):
@@ -241,7 +475,10 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
         response_model=QueryDataResponse,
         dependencies=[Depends(combined_auth)],
     )
-    async def query_data(request: QueryRequest):
+    async def query_data(
+        request: QueryRequest,
+        current_user: CurrentUser = Depends(get_current_user_optional),
+    ):
         """
         Retrieve structured data without LLM generation.
 
@@ -262,14 +499,54 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
         """
         try:
             param = request.to_query_params(False)  # No streaming for data endpoint
+            logger.info("AZ >> /query/data invoked with params {parma}")
+            filters = build_access_filters(request.access_filters)
+            accessible_docs = await get_user_accessible_files(
+                rag.doc_status,
+                current_user,
+                project_id=filters.project_id,
+                include_shared=True,
+                include_public=True,
+                filters=filters,
+                required_permission=Permission.VIEW,
+            )
+            
+            # Apply filename filter if provided (post-filter accessible docs)
+            if filters.filename:
+                accessible_docs = {
+                    doc_id: status for doc_id, status in accessible_docs.items()
+                    if filters.filename in (doc_file_path(status) or '')
+                }
+
+            if not accessible_docs:
+                raise HTTPException(
+                    status_code=403,
+                    detail="No accessible documents found for the provided metadata filters.",
+                )
+
+            if not apply_doc_id_filter(param, accessible_docs):
+                raise HTTPException(
+                    status_code=403,
+                    detail="No accessible documents found for the provided metadata filters.",
+                )
+
             response = await rag.aquery_data(request.query, param=param)
 
             # The aquery_data method returns a dict with entities, relationships, chunks, and metadata
             if isinstance(response, dict):
                 # Ensure all required fields exist and are lists/dicts
-                entities = response.get("entities", [])
-                relationships = response.get("relationships", [])
-                chunks = response.get("chunks", [])
+                entities = await filter_entities_by_access(
+                    response.get("entities", []),
+                    accessible_docs,
+                )
+                relationships = await filter_entities_by_access(
+                    response.get("relationships", []),
+                    accessible_docs,
+                )
+                chunks = await filter_chunks_by_access(
+                    response.get("chunks", []),
+                    accessible_docs,
+                )
                 metadata = response.get("metadata", {})
 
                 # Validate data types
@@ -281,6 +558,17 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                     chunks = []
                 if not isinstance(metadata, dict):
                     metadata = {}
+
+                accessible_paths = [
+                    path for path in (doc_file_path(status) for status in accessible_docs.values()) if path
+                ]
+                metadata.update(
+                    {
+                        "accessible_files": accessible_paths,
+                        "total_accessible_files": len(accessible_docs),
+                        "applied_filters": filters.__dict__,
+                    }
+                )
 
                 return QueryDataResponse(
                     entities=entities,

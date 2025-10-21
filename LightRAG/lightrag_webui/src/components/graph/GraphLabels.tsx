@@ -2,11 +2,9 @@ import { useCallback, useEffect } from 'react'
 import { AsyncSelect } from '@/components/ui/AsyncSelect'
 import { useSettingsStore } from '@/stores/settings'
 import { useGraphStore } from '@/stores/graph'
-import { labelListLimit, controlButtonVariant } from '@/lib/constants'
+import { labelListLimit } from '@/lib/constants'
 import MiniSearch from 'minisearch'
 import { useTranslation } from 'react-i18next'
-import { RefreshCw } from 'lucide-react'
-import Button from '@/components/ui/Button'
 
 const GraphLabels = () => {
   const { t } = useTranslation()
@@ -99,41 +97,8 @@ const GraphLabels = () => {
 
   }, [allDatabaseLabels, label, labelsFetchAttempted]);
 
-  const handleRefresh = useCallback(() => {
-    // Reset fetch status flags
-    useGraphStore.getState().setLabelsFetchAttempted(false)
-    useGraphStore.getState().setGraphDataFetchAttempted(false)
-
-    // Clear last successful query label to ensure labels are fetched
-    useGraphStore.getState().setLastSuccessfulQueryLabel('')
-
-    // Get current label
-    const currentLabel = useSettingsStore.getState().queryLabel
-
-    // If current label is empty, use default label '*'
-    if (!currentLabel) {
-      useSettingsStore.getState().setQueryLabel('*')
-    } else {
-      // Trigger data reload
-      useSettingsStore.getState().setQueryLabel('')
-      setTimeout(() => {
-        useSettingsStore.getState().setQueryLabel(currentLabel)
-      }, 0)
-    }
-  }, []);
-
   return (
     <div className="flex items-center">
-      {/* Always show refresh button */}
-      <Button
-        size="icon"
-        variant={controlButtonVariant}
-        onClick={handleRefresh}
-        tooltip={t('graphPanel.graphLabels.refreshTooltip')}
-        className="mr-2"
-      >
-        <RefreshCw className="h-4 w-4" />
-      </Button>
       <AsyncSelect<string>
         className="min-w-[300px]"
         triggerClassName="max-h-8"

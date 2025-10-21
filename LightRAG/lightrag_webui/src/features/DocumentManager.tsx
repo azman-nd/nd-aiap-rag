@@ -14,9 +14,10 @@ import {
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card'
 import EmptyCard from '@/components/ui/EmptyCard'
 import Checkbox from '@/components/ui/Checkbox'
-import UploadDocumentsDialog from '@/components/documents/UploadDocumentsDialog'
+import SimpleUploadDialog from '@/components/documents/SimpleUploadDialog'
 import ClearDocumentsDialog from '@/components/documents/ClearDocumentsDialog'
 import DeleteDocumentsDialog from '@/components/documents/DeleteDocumentsDialog'
+import MetadataDialog from '@/components/documents/MetadataDialog'
 import PaginationControls from '@/components/ui/PaginationControls'
 import { SchemeProvider } from '@/contexts/SchemeContext';
 import SchemeManager from '@/components/documents/SchemeManager/SchemeManager'
@@ -63,25 +64,7 @@ const getDisplayFileName = (doc: DocStatusResponse, maxLength: number = 20): str
     : fileName;
 };
 
-const formatMetadata = (metadata: Record<string, any>): string => {
-  const formattedMetadata = { ...metadata };
-
-  if (formattedMetadata.processing_start_time && typeof formattedMetadata.processing_start_time === 'number') {
-    const date = new Date(formattedMetadata.processing_start_time * 1000);
-    if (!isNaN(date.getTime())) {
-      formattedMetadata.processing_start_time = date.toLocaleString();
-    }
-  }
-
-  if (formattedMetadata.processing_end_time && typeof formattedMetadata.processing_end_time === 'number') {
-    const date = new Date(formattedMetadata.processing_end_time * 1000);
-    if (!isNaN(date.getTime())) {
-      formattedMetadata.processing_end_time = date.toLocaleString();
-    }
-  }
-
-  return JSON.stringify(formattedMetadata, null, 2);
-};
+// formatMetadata function removed - now using MetadataDialog component instead of tooltip
 
 const pulseStyle = `
 /* Tooltip styles */
@@ -221,6 +204,8 @@ export default function DocumentManager() {
   })
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({ all: 0 })
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [metadataDialogOpen, setMetadataDialogOpen] = useState(false)
+  const [selectedMetadata, setSelectedMetadata] = useState<{ metadata: Record<string, any>, filename: string } | null>(null)
 
   // Sort state
   const [sortField, setSortField] = useState<SortField>('updated_at')
@@ -1159,7 +1144,7 @@ export default function DocumentManager() {
             ) : !isSelectionMode ? (
               <ClearDocumentsDialog onDocumentsCleared={handleDocumentsCleared} />
             ) : null}
-            <UploadDocumentsDialog onDocumentsUploaded={fetchDocuments} />
+            <SimpleUploadDialog onDocumentsUploaded={fetchDocuments} />
             <SchemeManager />
             <PipelineStatusDialog
               open={showPipelineStatus}
@@ -1322,11 +1307,15 @@ export default function DocumentManager() {
                             )}
                           </div>
                         </TableHead>
+                        <TableHead>{t('documentPanel.documentManager.columns.projectId', 'Project ID')}</TableHead>
                         <TableHead>{t('documentPanel.documentManager.columns.summary')}</TableHead>
                         <TableHead>{t('documentPanel.documentManager.columns.handler')}</TableHead>
                         <TableHead>{t('documentPanel.documentManager.columns.status')}</TableHead>
                         <TableHead>{t('documentPanel.documentManager.columns.length')}</TableHead>
-                        <TableHead>{t('documentPanel.documentManager.columns.chunks')}</TableHead>
+                        <TableHead className="text-center">{t('documentPanel.documentManager.columns.chunks')}</TableHead>
+                        <TableHead className="text-center">{t('documentPanel.documentManager.columns.nodes', 'Nodes')}</TableHead>
+                        <TableHead className="text-center">{t('documentPanel.documentManager.columns.edges', 'Edges')}</TableHead>
+                        <TableHead className="text-center">{t('documentPanel.documentManager.columns.multimodal', 'Multimodal')}</TableHead>
                         <TableHead
                           onClick={() => handleSort('created_at')}
                           className="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800 select-none"
@@ -1385,6 +1374,9 @@ export default function DocumentManager() {
                               </div>
                             )}
                           </TableCell>
+                          <TableCell className="truncate max-w-[120px]">
+                            {doc.metadata?.project_id || '-'}
+                          </TableCell>
                           <TableCell className="max-w-xs min-w-45 truncate overflow-visible">
                             <div className="group relative overflow-visible tooltip-container">
                               <div className="truncate">
@@ -1423,24 +1415,30 @@ export default function DocumentManager() {
                               {doc.error_msg ? (
                                 <AlertTriangle className="ml-2 h-4 w-4 text-yellow-500" />
                               ) : (doc.metadata && Object.keys(doc.metadata).length > 0) && (
-                                <Info className="ml-2 h-4 w-4 text-blue-500" />
+                                <button
+                                  onClick={() => {
+                                    setSelectedMetadata({ metadata: doc.metadata!, filename: doc.file_path })
+                                    setMetadataDialogOpen(true)
+                                  }}
+                                  className="ml-2 hover:opacity-70 transition-opacity"
+                                >
+                                  <Info className="h-4 w-4 text-blue-500" />
+                                </button>
                               )}
 
-                              {/* Tooltip rendering logic */}
-                              {(doc.error_msg || (doc.metadata && Object.keys(doc.metadata).length > 0)) && (
+                              {/* Error tooltip - keep for errors */}
+                              {doc.error_msg && (
                                 <div className="invisible group-hover:visible tooltip">
-                                  {doc.error_msg && (
-                                    <pre>{doc.error_msg}</pre>
-                                  )}
-                                  {doc.metadata && Object.keys(doc.metadata).length > 0 && (
-                                    <pre>{formatMetadata(doc.metadata)}</pre>
-                                  )}
+                                  <pre>{doc.error_msg}</pre>
                                 </div>
                               )}
                             </div>
                           </TableCell>
                           <TableCell>{doc.content_length ?? '-'}</TableCell>
-                          <TableCell>{doc.chunks_count ?? '-'}</TableCell>
+                          <TableCell className="text-center">{doc.chunks_count ?? '-'}</TableCell>
+                          <TableCell className="text-center">{doc.metadata?.nodes_count ?? '-'}</TableCell>
+                          <TableCell className="text-center">{doc.metadata?.edges_count ?? '-'}</TableCell>
+                          <TableCell className="text-center">{doc.multimodal_content?.length ?? '-'}</TableCell>
                           <TableCell className="truncate">
                             {doc.created_at ? new Date(doc.created_at).toLocaleString() : '-'}
                           </TableCell>
@@ -1465,6 +1463,19 @@ export default function DocumentManager() {
           </CardContent>
         </Card>
       </CardContent>
+
+      {/* Metadata Modal */}
+      {selectedMetadata && (
+        <MetadataDialog
+          isOpen={metadataDialogOpen}
+          onClose={() => {
+            setMetadataDialogOpen(false)
+            setSelectedMetadata(null)
+          }}
+          metadata={selectedMetadata.metadata}
+          filename={selectedMetadata.filename}
+        />
+      )}
     </Card>
   )
 }

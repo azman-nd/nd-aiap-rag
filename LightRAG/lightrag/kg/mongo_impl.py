@@ -1477,8 +1477,10 @@ class MongoGraphStorage(BaseGraphStorage):
         """
         # TODO: Implement file_path filtering for MongoDB aggregation pipelines
         if file_path:
-            logger.warning(f"[{self.workspace}] MongoDB file_path filtering not yet implemented, ignoring filter: {file_path}")
-        
+            logger.warning(
+                f"[{self.workspace}] MongoDB file_path filtering not yet implemented, ignoring filter: {file_path}"
+            )
+
         # Use global_config max_graph_nodes as default if max_nodes is None
         if max_nodes is None:
             max_nodes = self.global_config.get("max_graph_nodes", 1000)

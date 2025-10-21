@@ -19,6 +19,7 @@ from fastapi import (
     Depends,
     File,
     HTTPException,
+    Query,
     UploadFile,
     Form,
 )
@@ -30,6 +31,18 @@ from lightrag.utils import generate_track_id
 from lightrag.api.utils_api import get_combined_auth_dependency
 from ..config import global_args
 from raganything import RAGAnything
+from ..access_control import (
+    AccessFilters,
+    CurrentUser,
+    Permission,
+    ShareEntry,
+    doc_file_path,
+    get_current_user_optional,
+    get_current_user_required,
+    get_user_accessible_files,
+    normalize_share_items,
+    normalize_tag_items,
+)
 
 
 # Function to format datetime to ISO format string with timezone information
@@ -111,6 +124,67 @@ def sanitize_filename(filename: str, input_dir: Path) -> str:
     return clean_name
 
 
+def _maybe_model_dump_list(items: Any) -> Any:
+    """Convert a list of Pydantic models to plain dictionaries when needed."""
+
+    if items is None:
+        return None
+    if isinstance(items, list) and items and hasattr(items[0], "model_dump"):
+        return [item.model_dump() for item in items]
+    return items
+
+
+def build_access_metadata(
+    *,
+    current_user: CurrentUser,
+    project_id: Optional[str],
+    is_public: bool,
+    raw_tags: Any,
+    raw_share: Any,
+    owner: Optional[str],
+) -> dict[str, Any]:
+    """Normalize request metadata into the stored metadata schema."""
+
+    tags = normalize_tag_items(_maybe_model_dump_list(raw_tags))
+    share_entries = list(normalize_share_items(_maybe_model_dump_list(raw_share)))
+
+    resolved_owner = owner.strip() if isinstance(owner, str) else owner
+    if current_user.is_authenticated and current_user.user_id:
+        resolved_owner = resolved_owner or current_user.user_id
+
+    metadata: dict[str, Any] = {
+        "is_public": bool(is_public),
+        "project_id": (project_id or "default").strip() if project_id else "default",
+        "tags": tags,
+        "uploaded_by": current_user.username if current_user.is_authenticated else "anonymous",
+        "upload_timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+    if resolved_owner:
+        metadata["owner"] = resolved_owner
+        # Maintain backwards compatibility with legacy access control logic
+        metadata["user_id"] = resolved_owner
+
+    if resolved_owner:
+        owner_entry = ShareEntry(
+            target_type="user",
+            permission=Permission.EDIT,
+            identifier=resolved_owner,
+        )
+        if not any(
+            entry.target_type == owner_entry.target_type
+            and entry.permission == owner_entry.permission
+            and entry.identifier == owner_entry.identifier
+            for entry in share_entries
+        ):
+            share_entries.append(owner_entry)
+
+    metadata["share"] = [entry.as_string() for entry in share_entries]
+    metadata["share_parsed"] = [entry.as_dict() for entry in share_entries]
+
+    return metadata
+
+
 class SchemeConfig(BaseModel):
     """Configuration model for processing schemes.
 
@@ -184,6 +258,11 @@ class ScanRequest(BaseModel):
     """Request model for document scanning operations."""
 
     schemeConfig: SchemeConfig = Field(..., description="Scanning scheme configuration")
+    project_id: Optional[str] = Field(None, description="Project identifier for grouping documents")
+    is_public: bool = Field(False, description="Whether documents are publicly accessible")
+    tags: Optional[List[Dict[str, str]]] = Field(None, description="Tags for categorizing documents")
+    share: Optional[List[ShareEntry]] = Field(None, description="Share entries for access control")
+    owner: Optional[str] = Field(None, description="Explicit owner user ID")
 
 
 class ScanResponse(BaseModel):
@@ -213,12 +292,60 @@ class ScanResponse(BaseModel):
         }
 
 
+class TagSpec(BaseModel):
+    """Tag specification with user-defined name and value."""
+
+    name: str = Field(..., description="Tag name")
+    value: Optional[str] = Field(default="", description="Tag value")
+
+    @field_validator("name", mode="after")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Tag name cannot be empty")
+        return value
+
+    @field_validator("value", mode="after")
+    @classmethod
+    def normalize_value(cls, value: Optional[str]) -> Optional[str]:
+        return value.strip() if isinstance(value, str) else value
+
+
+class ShareSpec(BaseModel):
+    """Share entry specification following target:permission:identifier format."""
+
+    target_type: Literal["user", "role"] = Field(..., description="Share target type")
+    permission: Literal["view", "edit"] = Field(..., description="Granted permission")
+    identifier: str = Field(..., description="Target identifier (user id or role name)")
+
+    @field_validator("target_type", "permission", mode="before")
+    @classmethod
+    def lowercase_values(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return value.lower().strip()
+        return value
+
+    @field_validator("identifier", mode="after")
+    @classmethod
+    def validate_identifier(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Share identifier cannot be empty")
+        return value
+
+
 class InsertTextRequest(BaseModel):
     """Request model for inserting a single text document
 
     Attributes:
         text: The text content to be inserted into the RAG system
         file_source: Source of the text (optional)
+        project_id: Project identifier for grouping (optional)
+        is_public: Whether document is publicly accessible (optional)
+        tags: List of tag specifications (optional)
+        share: Share policy entries (optional)
+        owner: Explicit owner user id (optional)
     """
 
     text: str = Field(
@@ -226,6 +353,15 @@ class InsertTextRequest(BaseModel):
         description="The text to insert",
     )
     file_source: str = Field(default=None, min_length=0, description="File Source")
+    project_id: Optional[str] = Field(default=None, description="Project identifier")
+    is_public: bool = Field(default=False, description="Whether document is publicly accessible")
+    tags: Optional[list[TagSpec]] = Field(default=None, description="List of tags (name/value pairs)")
+    share: Optional[list[ShareSpec]] = Field(
+        default=None, description="List of share entries granting view or edit permissions"
+    )
+    owner: Optional[str] = Field(
+        default=None, description="Explicit owner user id (defaults to authenticated user)"
+    )
 
     @field_validator("text", mode="after")
     @classmethod
@@ -237,11 +373,22 @@ class InsertTextRequest(BaseModel):
     def strip_source_after(cls, file_source: str) -> str:
         return file_source.strip()
 
+    @field_validator("owner", mode="after")
+    @classmethod
+    def normalize_owner(cls, owner: Optional[str]) -> Optional[str]:
+        return owner.strip() if isinstance(owner, str) else owner
+
     class Config:
         json_schema_extra = {
             "example": {
                 "text": "This is a sample text to be inserted into the RAG system.",
                 "file_source": "Source of the text (optional)",
+                "project_id": "project-alpha",
+                "is_public": False,
+                "tags": [{"name": "department", "value": "finance"}],
+                "share": [
+                    {"target_type": "user", "permission": "view", "identifier": "user-b"}
+                ],
             }
         }
 
@@ -252,6 +399,11 @@ class InsertTextsRequest(BaseModel):
     Attributes:
         texts: List of text contents to be inserted into the RAG system
         file_sources: Sources of the texts (optional)
+        project_id: Project identifier for grouping (optional)
+        is_public: Whether documents are publicly accessible (optional)
+        tags: List of tag specifications (optional)
+        share: Share policy entries (optional)
+        owner: Explicit owner user id (optional)
     """
 
     texts: list[str] = Field(
@@ -260,6 +412,15 @@ class InsertTextsRequest(BaseModel):
     )
     file_sources: list[str] = Field(
         default=None, min_length=0, description="Sources of the texts"
+    )
+    project_id: Optional[str] = Field(default=None, description="Project identifier")
+    is_public: bool = Field(default=False, description="Whether documents are publicly accessible")
+    tags: Optional[list[TagSpec]] = Field(default=None, description="List of tags (name/value pairs)")
+    share: Optional[list[ShareSpec]] = Field(
+        default=None, description="List of share entries granting view or edit permissions"
+    )
+    owner: Optional[str] = Field(
+        default=None, description="Explicit owner user id (defaults to authenticated user)"
     )
 
     @field_validator("texts", mode="after")
@@ -272,6 +433,11 @@ class InsertTextsRequest(BaseModel):
     def strip_sources_after(cls, file_sources: list[str]) -> list[str]:
         return [file_source.strip() for file_source in file_sources]
 
+    @field_validator("owner", mode="after")
+    @classmethod
+    def normalize_owner(cls, owner: Optional[str]) -> Optional[str]:
+        return owner.strip() if isinstance(owner, str) else owner
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -281,6 +447,14 @@ class InsertTextsRequest(BaseModel):
                 ],
                 "file_sources": [
                     "First file source (optional)",
+                ],
+                "project_id": "project-alpha",
+                "tags": [
+                    {"name": "department", "value": "finance"},
+                    {"name": "quarter", "value": "Q1"},
+                ],
+                "share": [
+                    {"target_type": "role", "permission": "view", "identifier": "analyst"}
                 ],
             }
         }
@@ -870,7 +1044,11 @@ def get_unique_filename_in_enqueued(target_dir: Path, original_name: str) -> str
 
 
 async def pipeline_enqueue_file(
-    rag: LightRAG, file_path: Path, track_id: str = None, scheme_name: str = None
+    rag: LightRAG,
+    file_path: Path,
+    track_id: str = None,
+    scheme_name: str = None,
+    metadata: dict[str, Any] | None = None,
 ) -> tuple[bool, str]:
     """Add a file to the queue for processing
 
@@ -880,6 +1058,7 @@ async def pipeline_enqueue_file(
         track_id: Optional tracking ID, if not provided will be generated
         scheme_name (str, optional): Processing scheme name for categorization.
             Defaults to None
+        metadata (dict, optional): Document metadata captured during upload
     Returns:
         tuple: (success: bool, track_id: str)
     """
@@ -1256,6 +1435,7 @@ async def pipeline_enqueue_file(
                     file_paths=file_path.name,
                     track_id=track_id,
                     scheme_name=scheme_name,
+                    metadata=metadata,
                 )
 
                 logger.info(
@@ -1340,7 +1520,11 @@ async def pipeline_enqueue_file(
 
 
 async def pipeline_index_file(
-    rag: LightRAG, file_path: Path, track_id: str = None, scheme_name: str = None
+    rag: LightRAG,
+    file_path: Path,
+    track_id: str = None,
+    scheme_name: str = None,
+    metadata: dict[str, Any] | None = None,
 ):
     """Index a file with track_id
 
@@ -1350,10 +1534,11 @@ async def pipeline_index_file(
         track_id: Optional tracking ID
         scheme_name (str, optional): Processing scheme name for categorization.
             Defaults to None
+        metadata (dict, optional): Document metadata captured during upload
     """
     try:
         success, returned_track_id = await pipeline_enqueue_file(
-            rag, file_path, track_id, scheme_name
+            rag, file_path, track_id, scheme_name, metadata=metadata
         )
         if success:
             await rag.apipeline_process_enqueue_documents()
@@ -1407,6 +1592,7 @@ async def pipeline_index_files_raganything(
     scheme_name: str = None,
     parser: str = None,
     source: str = None,
+    metadata: dict[str, Any] | None = None,
 ):
     """Index multiple files using RAGAnything framework for multimodal processing.
 
@@ -1419,6 +1605,8 @@ async def pipeline_index_files_raganything(
         parser (str, optional): Document extraction tool to use.
             Defaults to None.
         source (str, optional): The model source used by Mineru.
+            Defaults to None.
+        metadata (dict, optional): Access control metadata to apply to all files in batch.
             Defaults to None.
 
     Note:
@@ -1446,6 +1634,7 @@ async def pipeline_index_files_raganything(
                 scheme_name=scheme_name,
                 parser=parser,
                 source=source,
+                metadata=metadata,
             )
             if success:
                 pass
@@ -1461,14 +1650,16 @@ async def pipeline_index_texts(
     texts: List[str],
     file_sources: List[str] = None,
     track_id: str = None,
+    metadata: dict = None,
 ):
-    """Index a list of texts with track_id
+    """Index a list of texts with track_id and metadata
 
     Args:
         rag: LightRAG instance
         texts: The texts to index
         file_sources: Sources of the texts
         track_id: Optional tracking ID
+        metadata: Optional metadata dict for access control
     """
     if not texts:
         return
@@ -1478,9 +1669,40 @@ async def pipeline_index_texts(
                 file_sources.append("unknown_source")
                 for _ in range(len(file_sources), len(texts))
             ]
+    
+    # Enqueue documents
     await rag.apipeline_enqueue_documents(
-        input=texts, file_paths=file_sources, track_id=track_id
+        input=texts,
+        file_paths=file_sources,
+        track_id=track_id,
+        metadata=metadata,
     )
+    
+    # If metadata is provided, update the doc_status entries with metadata
+    if metadata:
+        # Get the doc IDs that were just enqueued
+        from lightrag.utils import compute_mdhash_id, sanitize_text_for_encoding
+        
+        for text, file_source in zip(texts, file_sources or [None] * len(texts)):
+            cleaned_content = sanitize_text_for_encoding(text)
+            doc_id = compute_mdhash_id(cleaned_content, prefix="doc-")
+            
+            # Get current doc_status and update with metadata
+            current_doc_status = await rag.doc_status.get_by_id(doc_id)
+            if current_doc_status:
+                # Merge metadata with existing metadata
+                existing_metadata = current_doc_status.get("metadata", {})
+                merged_metadata = {**existing_metadata, **metadata}
+                
+                await rag.doc_status.upsert({
+                    doc_id: {
+                        **current_doc_status,
+                        "metadata": merged_metadata,
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                })
+                logger.debug(f"Updated doc_status with metadata for {doc_id}")
+    
     await rag.apipeline_process_enqueue_documents()
 
 
@@ -1490,6 +1712,7 @@ async def run_scanning_process(
     doc_manager: DocumentManager,
     track_id: str = None,
     schemeConfig=None,
+    metadata: dict[str, Any] | None = None,
 ):
     """Background task to scan and index documents
 
@@ -1499,6 +1722,8 @@ async def run_scanning_process(
         doc_manager: DocumentManager instance
         track_id: Optional tracking ID to pass to all scanned files
         schemeConfig: Scanning scheme configuration.
+            Defaults to None
+        metadata: Access control metadata to apply to all scanned files.
             Defaults to None
     """
     try:
@@ -1517,6 +1742,29 @@ async def run_scanning_process(
         modelSource = schemeConfig.modelSource
 
         if new_files:
+            # For files that previously failed, preserve their metadata
+            # This is important for retry scenarios
+            if metadata is None:
+                try:
+                    failed_docs = await rag.doc_status.get_docs_by_status(DocStatus.FAILED)
+                    for file_path in new_files:
+                        filename = file_path.name
+                        for doc_id, doc_status in failed_docs.items():
+                            doc_file_path = doc_status.get("file_path") if isinstance(doc_status, dict) else getattr(doc_status, "file_path", None)
+                            if doc_file_path == filename:
+                                failed_metadata = doc_status.get("metadata") if isinstance(doc_status, dict) else getattr(doc_status, "metadata", {})
+                                if failed_metadata:
+                                    logger.info(f"Found failed document metadata for {filename}, will reuse for retry")
+                                    # Note: This reuses metadata from first found failed doc
+                                    # If scanning multiple files, they all get the same metadata
+                                    # This is acceptable for retry scenarios
+                                    metadata = failed_metadata
+                                    break
+                        if metadata:
+                            break  # Found metadata, use it for all files
+                except Exception as e:
+                    logger.warning(f"Could not check for failed document metadata: {e}")
+            
             # Process all files at once with track_id
             if is_pipeline_busy:
                 logger.info(
@@ -1542,6 +1790,7 @@ async def run_scanning_process(
                     scheme_name=scheme_name,
                     parser=extractor,
                     source=modelSource,
+                    metadata=metadata,
                 )
                 logger.info(
                     f"Scanning process completed with raganything: {total_files} files Processed."
@@ -1998,20 +2247,40 @@ def create_document_routes(
         "/scan", response_model=ScanResponse, dependencies=[Depends(combined_auth)]
     )
     async def scan_for_new_documents(
-        request: ScanRequest, background_tasks: BackgroundTasks
+        request: ScanRequest, 
+        background_tasks: BackgroundTasks,
+        current_user: CurrentUser = Depends(get_current_user_optional),
     ):
         """
-        Trigger the scanning process for new documents.
+        Trigger the scanning process for new documents with access control.
 
         This endpoint initiates a background task that scans the input directory for new documents
         and processes them. If a scanning process is already running, it returns a status indicating
-        that fact.
+        that fact. Access control metadata can be applied to all scanned files.
+
+        Args:
+            request: Scan request containing scheme config and optional access control metadata
+            background_tasks: FastAPI BackgroundTasks for async processing
+            current_user: Automatically extracted from JWT token (optional)
 
         Returns:
             ScanResponse: A response object containing the scanning status and track_id
         """
         # Generate track_id with "scan" prefix for scanning operation
         track_id = generate_track_id("scan")
+
+        # Build access control metadata if provided
+        metadata = None
+        if request.project_id or request.tags or request.share or request.owner or request.is_public:
+            metadata = build_access_metadata(
+                current_user=current_user,
+                project_id=request.project_id,
+                is_public=request.is_public,
+                raw_tags=request.tags,
+                raw_share=request.share,
+                owner=request.owner,
+            )
+            logger.info(f"Scan with access control metadata: {metadata}")
 
         # Start the scanning process in the background with track_id
         background_tasks.add_task(
@@ -2021,6 +2290,7 @@ def create_document_routes(
             doc_manager,
             track_id,
             schemeConfig=request.schemeConfig,
+            metadata=metadata,
         )
         return ScanResponse(
             status="scanning_started",
@@ -2035,19 +2305,35 @@ def create_document_routes(
         background_tasks: BackgroundTasks,
         file: UploadFile = File(...),
         schemeId: str = Form(...),
+        project_id: str = Form(None),
+        is_public: bool = Form(False),
+        tags: str = Form(None),
+        share: str = Form(None),
+        owner: str = Form(None),
+        current_user: CurrentUser = Depends(get_current_user_optional),
     ):
         """
-        Upload a file to the input directory and index it.
+        Upload a file to the input directory and index it with access control.
 
         This API endpoint accepts a file through an HTTP POST request, checks if the
         uploaded file is of a supported type, saves it in the specified input directory,
         indexes it for retrieval, and returns a success status with relevant details.
+        
+        User identity is automatically extracted from JWT token in Authorization header.
+        Access control metadata is stored with the document.
 
         Args:
             background_tasks: FastAPI BackgroundTasks for async processing
             file (UploadFile): The file to be uploaded. It must have an allowed extension
             schemeId (str): ID of the processing scheme to use for this file. The scheme
                 determines whether to use LightRAG or RAGAnything framework for processing.
+            project_id (str, optional): Project identifier for grouping documents
+            is_public (bool, optional): Whether document is publicly accessible (default: False)
+            tags (str, optional): Tag payload (JSON array or comma separated "name:value" pairs)
+            share (str, optional): Share entries payload (JSON array or comma separated strings
+                formatted as 'target_type:permission:identifier')
+            owner (str, optional): Explicit owner user id. Defaults to authenticated user if omitted
+            current_user (CurrentUser): Automatically extracted from JWT token (optional)
 
         Returns:
             InsertResponse: A response object containing the upload status and a message.
@@ -2079,6 +2365,41 @@ def create_document_routes(
                 shutil.copyfileobj(file.file, buffer)
 
             track_id = generate_track_id("upload")
+            
+            # Check if this file was previously processed and failed
+            # If so, retrieve and reuse the metadata for retry
+            doc_pre_id = f"doc-pre-{safe_filename}"
+            existing_failed_doc = None
+            try:
+                # Check for existing doc-pre-* first
+                existing_pre_doc = await rag.doc_status.get_by_id(doc_pre_id)
+                if existing_pre_doc and existing_pre_doc.get("metadata"):
+                    logger.info(f"Found existing doc-pre-* metadata for {safe_filename}, will merge with new metadata")
+                    # Merge: new metadata takes precedence, but preserve fields not provided
+                    existing_metadata = existing_pre_doc.get("metadata", {})
+                    for key, value in existing_metadata.items():
+                        if key not in metadata or metadata[key] in [None, "", [], {}]:
+                            metadata[key] = value
+                            logger.info(f"Preserved metadata field '{key}' from previous attempt")
+                
+                # Also check for failed documents with same filename
+                failed_docs = await rag.doc_status.get_docs_by_status(DocStatus.FAILED)
+                for doc_id, doc_status in failed_docs.items():
+                    doc_file_path = doc_status.get("file_path") if isinstance(doc_status, dict) else getattr(doc_status, "file_path", None)
+                    if doc_file_path == safe_filename:
+                        existing_failed_doc = doc_status
+                        logger.info(f"Found failed document {doc_id} for file {safe_filename}")
+                        # Merge metadata from failed document
+                        failed_metadata = doc_status.get("metadata") if isinstance(doc_status, dict) else getattr(doc_status, "metadata", {})
+                        if failed_metadata:
+                            for key, value in failed_metadata.items():
+                                if key not in metadata or metadata[key] in [None, "", [], {}]:
+                                    metadata[key] = value
+                                    logger.info(f"Preserved metadata field '{key}' from failed document")
+                        break
+            except Exception as e:
+                logger.warning(f"Could not check for existing metadata: {e}")
+                # Continue with provided metadata
 
             def load_config():
                 try:
@@ -2101,6 +2422,24 @@ def create_document_routes(
             current_modelSource = config.get("modelSource")
             doc_pre_id = f"doc-pre-{safe_filename}"
 
+            # Parse JSON strings for access control
+            metadata = build_access_metadata(
+                current_user=current_user,
+                project_id=project_id,
+                is_public=is_public,
+                raw_tags=tags,
+                raw_share=share,
+                owner=owner,
+            )
+
+            logger.info(
+                "Document upload metadata: owner=%s, project_id=%s, is_public=%s, share=%s",
+                metadata.get("owner"),
+                metadata.get("project_id"),
+                is_public,
+                metadata.get("share"),
+            )
+
             if current_framework and current_framework == "lightrag":
                 # Add to background tasks and get track_id
                 background_tasks.add_task(
@@ -2109,8 +2448,10 @@ def create_document_routes(
                     file_path,
                     track_id,
                     scheme_name=current_framework,
+                    metadata=metadata,
                 )
             else:
+                logger.info("AZ>> adding background task for raganything processing")
                 background_tasks.add_task(
                     rag_anything.process_document_complete_lightrag_api,
                     file_path=str(file_path),
@@ -2119,8 +2460,11 @@ def create_document_routes(
                     scheme_name=current_framework,
                     parser=current_extractor,
                     source=current_modelSource,
+                    metadata=metadata,
                 )
 
+            
+            logger.info(f"AZ>> doc_status added, contains metadata {metadata}, track_id {track_id}")
             await rag.doc_status.upsert(
                 {
                     doc_pre_id: {
@@ -2133,6 +2477,7 @@ def create_document_routes(
                         "created_at": "",
                         "updated_at": "",
                         "file_path": safe_filename,
+                        "metadata": metadata,
                     }
                 }
             )
@@ -2152,17 +2497,20 @@ def create_document_routes(
         "/text", response_model=InsertResponse, dependencies=[Depends(combined_auth)]
     )
     async def insert_text(
-        request: InsertTextRequest, background_tasks: BackgroundTasks
+        request: InsertTextRequest, 
+        background_tasks: BackgroundTasks,
+        current_user: CurrentUser = Depends(get_current_user_optional),
     ):
         """
-        Insert text into the RAG system.
+        Insert text into the RAG system with access control.
 
         This endpoint allows you to insert text data into the RAG system for later retrieval
-        and use in generating responses.
+        and use in generating responses. User identity is automatically extracted from JWT token.
 
         Args:
             request (InsertTextRequest): The request body containing the text to be inserted.
             background_tasks: FastAPI BackgroundTasks for async processing
+            current_user (CurrentUser): Automatically extracted from JWT token (optional)
 
         Returns:
             InsertResponse: A response object containing the status of the operation.
@@ -2174,12 +2522,30 @@ def create_document_routes(
             # Generate track_id for text insertion
             track_id = generate_track_id("insert")
 
+            metadata = build_access_metadata(
+                current_user=current_user,
+                project_id=request.project_id,
+                is_public=request.is_public,
+                raw_tags=request.tags,
+                raw_share=request.share,
+                owner=request.owner,
+            )
+
+            logger.info(
+                "Text insert metadata: owner=%s, project_id=%s, is_public=%s, share=%s",
+                metadata.get("owner"),
+                metadata.get("project_id"),
+                request.is_public,
+                metadata.get("share"),
+            )
+
             background_tasks.add_task(
                 pipeline_index_texts,
                 rag,
                 [request.text],
                 file_sources=[request.file_source],
                 track_id=track_id,
+                metadata=metadata,
             )
 
             return InsertResponse(
@@ -2198,17 +2564,20 @@ def create_document_routes(
         dependencies=[Depends(combined_auth)],
     )
     async def insert_texts(
-        request: InsertTextsRequest, background_tasks: BackgroundTasks
+        request: InsertTextsRequest, 
+        background_tasks: BackgroundTasks,
+        current_user: CurrentUser = Depends(get_current_user_optional),
     ):
         """
-        Insert multiple texts into the RAG system.
+        Insert multiple texts into the RAG system with access control.
 
         This endpoint allows you to insert multiple text entries into the RAG system
-        in a single request.
+        in a single request. User identity is automatically extracted from JWT token.
 
         Args:
             request (InsertTextsRequest): The request body containing the list of texts.
             background_tasks: FastAPI BackgroundTasks for async processing
+            current_user (CurrentUser): Automatically extracted from JWT token (optional)
 
         Returns:
             InsertResponse: A response object containing the status of the operation.
@@ -2220,12 +2589,30 @@ def create_document_routes(
             # Generate track_id for texts insertion
             track_id = generate_track_id("insert")
 
+            metadata = build_access_metadata(
+                current_user=current_user,
+                project_id=request.project_id,
+                is_public=request.is_public,
+                raw_tags=request.tags,
+                raw_share=request.share,
+                owner=request.owner,
+            )
+
+            logger.info(
+                "Texts insert metadata: owner=%s, project_id=%s, is_public=%s, share=%s",
+                metadata.get("owner"),
+                metadata.get("project_id"),
+                request.is_public,
+                metadata.get("share"),
+            )
+
             background_tasks.add_task(
                 pipeline_index_texts,
                 rag,
                 request.texts,
                 file_sources=request.file_sources,
                 track_id=track_id,
+                metadata=metadata,
             )
 
             return InsertResponse(
@@ -2552,6 +2939,137 @@ def create_document_routes(
             return PipelineStatusResponse(**status_dict)
         except Exception as e:
             logger.error(f"Error getting pipeline status: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @router.get(
+        "/list",
+        response_model=List[str],
+        dependencies=[Depends(combined_auth)],
+    )
+    async def get_document_filenames(
+        project_id: Optional[str] = Query(None, description="Filter by project ID"),
+        owner: Optional[str] = Query(None, description="Filter by owner user ID"),
+        tags: Optional[str] = Query(None, description="Filter by tags (JSON array or comma separated)"),
+        current_user: CurrentUser = Depends(get_current_user_optional),
+    ) -> List[str]:
+        """
+        Get list of accessible document filenames for the current user.
+        
+        This endpoint returns a simplified list of just the filenames (file_path values)
+        from documents that are accessible to the current user based on their permissions.
+        Useful for populating dropdown selectors in UI filters.
+        
+        Args:
+            current_user: Current authenticated user (from JWT)
+            project_id: Optional project ID filter
+            owner: Optional owner user ID filter
+            tags: Optional tags filter
+            
+        Returns:
+            List[str]: List of unique filenames that the user has access to
+            
+        Raises:
+            HTTPException: If an error occurs while retrieving documents (500)
+        """
+        try:
+            # Build access filters
+            filters = AccessFilters(
+                project_id=project_id,
+                owner=owner,
+                tags=normalize_tag_items(tags),
+            )
+            
+            # Get accessible documents
+            accessible_docs = await get_user_accessible_files(
+                rag.doc_status,
+                current_user,
+                project_id=filters.project_id,
+                include_shared=True,
+                include_public=True,
+                filters=filters,
+                required_permission=Permission.VIEW,
+            )
+            
+            # Extract unique filenames
+            filenames = set()
+            for doc_status in accessible_docs.values():
+                file_path = doc_file_path(doc_status)
+                if file_path and file_path.strip():
+                    filenames.add(file_path)
+            
+            # Return sorted list
+            return sorted(list(filenames))
+            
+        except Exception as e:
+            logger.error(f"Error GET /documents/list: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @router.get(
+        "/projects",
+        response_model=List[str],
+        dependencies=[Depends(combined_auth)],
+    )
+    async def get_user_projects(
+        owner: Optional[str] = Query(None, description="Filter by owner user ID"),
+        tags: Optional[str] = Query(None, description="Filter by tags (JSON array or comma separated)"),
+        current_user: CurrentUser = Depends(get_current_user_optional),
+    ) -> List[str]:
+        """
+        Get list of unique project IDs from documents accessible to the current user.
+        
+        This endpoint returns a list of unique project_id values from the metadata
+        of all documents that the authenticated user has access to. Useful for
+        populating project filter dropdowns.
+        
+        Args:
+            current_user: Current authenticated user (from JWT)
+            owner: Optional owner user ID filter
+            tags: Optional tags filter
+            
+        Returns:
+            List[str]: List of unique project IDs sorted alphabetically
+            
+        Raises:
+            HTTPException: If an error occurs while retrieving documents (500)
+        """
+        try:
+            # Build access filters (no project_id filter here since we're listing projects)
+            filters = AccessFilters(
+                project_id=None,
+                owner=owner,
+                tags=normalize_tag_items(tags),
+            )
+            
+            # Get accessible documents
+            accessible_docs = await get_user_accessible_files(
+                rag.doc_status,
+                current_user,
+                project_id=None,
+                include_shared=True,
+                include_public=True,
+                filters=filters,
+                required_permission=Permission.VIEW,
+            )
+            
+            # Extract unique project IDs
+            project_ids = set()
+            for doc_status in accessible_docs.values():
+                metadata_source = getattr(doc_status, "metadata", None)
+                if metadata_source is None and isinstance(doc_status, dict):
+                    metadata_source = doc_status.get("metadata")
+                metadata = metadata_source or {}
+                
+                project_id = metadata.get("project_id")
+                if project_id and str(project_id).strip():
+                    project_ids.add(str(project_id).strip())
+            
+            # Return sorted list
+            return sorted(list(project_ids))
+            
+        except Exception as e:
+            logger.error(f"Error GET /documents/projects: {str(e)}")
             logger.error(traceback.format_exc())
             raise HTTPException(status_code=500, detail=str(e))
 
