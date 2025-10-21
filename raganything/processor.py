@@ -1507,6 +1507,7 @@ class ProcessorMixin:
         doc_id: str | None = None,
         scheme_name: str | None = None,
         parser: str | None = None,
+        metadata: dict | None = None,
         **kwargs,
     ):
         """
@@ -1520,6 +1521,9 @@ class ProcessorMixin:
             split_by_character: Optional character to split the text by
             split_by_character_only: If True, split only by the specified character
             doc_id: Optional document ID, if not provided will be generated from content
+            scheme_name: scheme name for categorization
+            parser: parser to use (mineru, docling, etc.)
+            metadata: Document metadata (access control, tags, etc.)
             **kwargs: Additional parameters for parser (e.g., lang, device, start_page, end_page, formula, table, backend, source)
         """
         file_name = os.path.basename(file_path)
@@ -1557,8 +1561,19 @@ class ProcessorMixin:
 
             self.logger.info(f"Starting complete document processing: {file_path}")
 
-            # Initialize doc status
+            # Initialize doc status and retrieve metadata
             current_doc_status = await self.lightrag.doc_status.get_by_id(doc_pre_id)
+            
+            # Retrieve metadata from doc_pre_id if not provided
+            if metadata is None and current_doc_status:
+                metadata = current_doc_status.get("metadata", {})
+                self.logger.info(f"Retrieved metadata from doc-pre-* status: {metadata}")
+            elif metadata is None:
+                metadata = {}
+                self.logger.info("No metadata provided and doc-pre-* not found, using empty metadata")
+            else:
+                self.logger.info(f"Using provided metadata: {metadata}")
+            
             if not current_doc_status:
                 await self.lightrag.doc_status.upsert(
                     {
@@ -1668,6 +1683,7 @@ class ProcessorMixin:
                     split_by_character_only=split_by_character_only,
                     ids=doc_id,
                     scheme_name=scheme_name,
+                    metadata=metadata,
                 )
 
             self.logger.info(f"Document {file_path} processing completed successfully")

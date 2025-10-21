@@ -22,7 +22,7 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent))
 
 from lightrag.llm.openai import openai_complete_if_cache, openai_embed
-from lightrag.utils import EmbeddingFunc, logger, set_verbose_debug
+from lightrag.utils import EmbeddingFunc, logger, set_verbose_debug, get_log_format, get_detailed_log_format
 from raganything import RAGAnything, RAGAnythingConfig
 
 from dotenv import load_dotenv
@@ -49,10 +49,10 @@ def configure_logging():
             "disable_existing_loggers": False,
             "formatters": {
                 "default": {
-                    "format": "%(levelname)s: %(message)s",
+                    "format": get_log_format(),
                 },
                 "detailed": {
-                    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                    "format": get_detailed_log_format(),
                 },
             },
             "handlers": {

@@ -183,6 +183,7 @@ async def insert_text_content_with_multimodal_content(
     ids: str | list[str] | None = None,
     file_paths: str | list[str] | None = None,
     scheme_name: str | None = None,
+    metadata: dict | None = None,
 ):
     """
     Insert pure text content into LightRAG
@@ -198,6 +199,7 @@ async def insert_text_content_with_multimodal_content(
         ids: single string of the document ID or list of unique document IDs, if not provided, MD5 hash IDs will be generated
         file_paths: single string of the file path or list of file paths, used for citation
         scheme_name: scheme name (optional)
+        metadata: Document metadata including access control information (optional)
     """
     logger.info("Starting text content insertion into LightRAG...")
 
@@ -211,6 +213,7 @@ async def insert_text_content_with_multimodal_content(
             split_by_character_only=split_by_character_only,
             ids=ids,
             scheme_name=scheme_name,
+            metadata=metadata,
         )
     except Exception as e:
         logger.info(f"Error: {e}")
