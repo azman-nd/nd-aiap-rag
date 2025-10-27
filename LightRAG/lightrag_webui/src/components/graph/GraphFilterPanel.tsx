@@ -10,6 +10,13 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/Select'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/Dialog'
 import { useSettingsStore } from '@/stores/settings'
 import { MetadataTag, getDocumentsList, getProjectsList } from '@/api/lightrag'
 
@@ -157,210 +164,195 @@ const GraphFilterPanel: React.FC<GraphFilterPanelProps> = ({ className = '' }) =
     (graphMetadataFilters.tags?.length || 0)
 
   return (
-    <div className={`relative ${className}`}>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setIsExpanded((prev) => !prev)}
-        className={`h-[52px] px-3 gap-1.5 border-2 ${
-          activeFilterCount > 0
-            ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900 dark:border-blue-700 dark:text-blue-300'
-            : ''
-        }`}
-      >
-        <Filter className="h-4 w-4" />
-        <span className="text-xs font-medium">Doc Filter</span>
-        {activeFilterCount > 0 && (
-          <span className="ml-1 px-1.5 py-0.5 text-xs font-semibold rounded-full bg-blue-600 text-white dark:bg-blue-400 dark:text-blue-900">
-            {activeFilterCount}
-          </span>
-        )}
-      </Button>
+    <div className={className}>
+      <Dialog open={isExpanded} onOpenChange={setIsExpanded}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsExpanded(true)}
+          className={`h-[52px] w-full px-3 gap-1.5 border-2 ${
+            activeFilterCount > 0
+              ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900 dark:border-blue-700 dark:text-blue-300'
+              : ''
+          }`}
+        >
+          <Filter className="h-4 w-4" />
+          <span className="text-xs font-medium">Doc Filter</span>
+          {activeFilterCount > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 text-xs font-semibold rounded-full bg-blue-600 text-white dark:bg-blue-400 dark:text-blue-900">
+              {activeFilterCount}
+            </span>
+          )}
+        </Button>
 
-      {isExpanded && (
-        <div className="absolute top-10 left-0 z-50 w-[450px] rounded-lg border border-border bg-background shadow-xl">
-          {/* Header */}
-          <div className="flex items-center justify-between p-3 border-b border-border bg-muted/50">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
+        <DialogContent className="max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
               <Filter className="h-4 w-4" />
               Document Filters
-            </h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsExpanded(false)}
-              className="h-6 w-6 p-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+            </DialogTitle>
+          </DialogHeader>
 
-          <div className="max-h-[600px] overflow-y-auto">
+          <div className="max-h-[600px] overflow-y-auto px-1">
             {/* Document Filters */}
-            <div>
-              {(
-                <div className="p-3 space-y-3 bg-muted/20">
-                  {/* Project ID */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Project ID</Label>
-                    <Select
-                      value={projectId || '__ALL__'}
-                      onValueChange={(value) => setProjectId(value === '__ALL__' ? '' : value)}
-                    >
-                      <SelectTrigger className="text-sm h-8">
-                        <SelectValue placeholder="All projects" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[300px]">
-                        {isLoadingProjects ? (
-                          <div className="p-2 text-sm text-muted-foreground text-center">
-                            Loading...
-                          </div>
-                        ) : availableProjects.length === 0 ? (
-                          <div className="p-2 text-sm text-muted-foreground text-center">
-                            No projects found
-                          </div>
-                        ) : (
-                          <>
-                            <SelectItem value="__ALL__">All projects</SelectItem>
-                            {availableProjects.map((project) => (
-                              <SelectItem key={project} value={project}>
-                                {project}
-                              </SelectItem>
-                            ))}
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Filename */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Filename</Label>
-                    <Select
-                      value={selectedFilename || '__ALL__'}
-                      onValueChange={(value) => setSelectedFilename(value === '__ALL__' ? '' : value)}
-                    >
-                      <SelectTrigger className="text-sm h-8">
-                        <SelectValue placeholder="All files" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[300px]">
-                        {isLoadingFiles ? (
-                          <div className="p-2 text-sm text-muted-foreground text-center">
-                            Loading...
-                          </div>
-                        ) : availableFiles.length === 0 ? (
-                          <div className="p-2 text-sm text-muted-foreground text-center">
-                            No files found
-                          </div>
-                        ) : (
-                          <>
-                            <SelectItem value="__ALL__">All files</SelectItem>
-                            {availableFiles.map((file) => (
-                              <SelectItem key={file} value={file}>
-                                {file}
-                              </SelectItem>
-                            ))}
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Is Public */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Visibility</Label>
-                    <Select
-                      value={isPublicFilter === null ? 'all' : isPublicFilter ? 'public' : 'private'}
-                      onValueChange={(value) => 
-                        setIsPublicFilter(value === 'all' ? null : value === 'public')
-                      }
-                    >
-                      <SelectTrigger className="text-sm h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All documents</SelectItem>
-                        <SelectItem value="public">Public only</SelectItem>
-                        <SelectItem value="private">Private only</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Tags */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Tags</Label>
-                    <div className="flex gap-1">
-                      <Input
-                        placeholder="name"
-                        value={tagDraft.name}
-                        onChange={(e) => setTagDraft((prev) => ({ ...prev, name: e.target.value }))}
-                        className="text-sm h-8 flex-1"
-                      />
-                      <Input
-                        placeholder="value"
-                        value={tagDraft.value || ''}
-                        onChange={(e) => setTagDraft((prev) => ({ ...prev, value: e.target.value }))}
-                        className="text-sm h-8 flex-1"
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={addTag}
-                        className="h-8 px-2"
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    {tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {tags.map((tag, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs"
-                          >
-                            <span className="font-medium">{tag.name}</span>
-                            {tag.value && <span>: {tag.value}</span>}
-                            <button
-                              onClick={() => removeTag(tag)}
-                              className="ml-1 hover:text-destructive"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
-                        ))}
+            <div className="space-y-3">
+              {/* Project ID */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Project ID</Label>
+                <Select
+                  value={projectId || '__ALL__'}
+                  onValueChange={(value) => setProjectId(value === '__ALL__' ? '' : value)}
+                >
+                  <SelectTrigger className="text-xs h-8">
+                    <SelectValue placeholder="All projects" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    {isLoadingProjects ? (
+                      <div className="p-2 text-sm text-muted-foreground text-center">
+                        Loading...
                       </div>
+                    ) : availableProjects.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground text-center">
+                        No projects found
+                      </div>
+                    ) : (
+                      <>
+                        <SelectItem value="__ALL__">All projects</SelectItem>
+                        {availableProjects.map((project) => (
+                          <SelectItem key={project} value={project}>
+                            {project}
+                          </SelectItem>
+                        ))}
+                      </>
                     )}
-                  </div>
+                  </SelectContent>
+                </Select>
+              </div>
 
+              {/* Filename */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Filename</Label>
+                <Select
+                  value={selectedFilename || '__ALL__'}
+                  onValueChange={(value) => setSelectedFilename(value === '__ALL__' ? '' : value)}
+                >
+                  <SelectTrigger className="text-xs h-8">
+                    <SelectValue placeholder="All files" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    {isLoadingFiles ? (
+                      <div className="p-2 text-sm text-muted-foreground text-center">
+                        Loading...
+                      </div>
+                    ) : availableFiles.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground text-center">
+                        No files found
+                      </div>
+                    ) : (
+                      <>
+                        <SelectItem value="__ALL__">All files</SelectItem>
+                        {availableFiles.map((file) => (
+                          <SelectItem key={file} value={file}>
+                            {file}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Is Public */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Visibility</Label>
+                <Select
+                  value={isPublicFilter === null ? 'all' : isPublicFilter ? 'public' : 'private'}
+                  onValueChange={(value) => 
+                    setIsPublicFilter(value === 'all' ? null : value === 'public')
+                  }
+                >
+                  <SelectTrigger className="text-xs h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All documents</SelectItem>
+                    <SelectItem value="public">Public only</SelectItem>
+                    <SelectItem value="private">Private only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Tags */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Tags</Label>
+                <div className="flex gap-1">
+                  <Input
+                    placeholder="name"
+                    value={tagDraft.name}
+                    onChange={(e) => setTagDraft((prev) => ({ ...prev, name: e.target.value }))}
+                    className="text-xs h-8 flex-1"
+                  />
+                  <Input
+                    placeholder="value"
+                    value={tagDraft.value || ''}
+                    onChange={(e) => setTagDraft((prev) => ({ ...prev, value: e.target.value }))}
+                    className="text-xs h-8 flex-1"
+                  />
                   <Button
+                    variant="outline"
                     size="sm"
-                    onClick={applyFilters}
-                    className="w-full h-8"
+                    onClick={addTag}
+                    className="h-8 px-2"
                   >
-                    <Search className="h-3 w-3 mr-1" />
-                    Apply Filters
+                    <Plus className="h-3 w-3" />
                   </Button>
                 </div>
-              )}
+                {tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {tags.map((tag, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs"
+                      >
+                        <span className="font-medium">{tag.name}</span>
+                        {tag.value && <span>: {tag.value}</span>}
+                        <button
+                          onClick={() => removeTag(tag)}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Footer */}
-          {activeFilterCount > 0 && (
-            <div className="p-3 border-t border-border bg-muted/50">
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            {activeFilterCount > 0 && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={clearAllFilters}
-                className="w-full h-8 text-destructive hover:text-destructive"
+                className="w-full sm:w-auto text-destructive hover:text-destructive"
               >
                 <X className="h-3 w-3 mr-1" />
                 Clear All Filters
               </Button>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+            <Button
+              size="sm"
+              onClick={applyFilters}
+              className="w-full sm:w-auto"
+            >
+              <Search className="h-3 w-3 mr-1" />
+              Apply Filters
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

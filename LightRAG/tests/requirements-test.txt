@@ -1,0 +1,22 @@
+# Testing dependencies for LightRAG
+
+# Core testing framework
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+
+# HTTP testing
+httpx>=0.24.0
+
+# Mocking (included in Python stdlib, but listed for clarity)
+# unittest.mock - built-in
+
+# FastAPI testing dependencies
+fastapi>=0.100.0
+pydantic>=2.0.0
+
+# Optional: for parallel test execution
+pytest-xdist>=3.3.0
+
+# Optional: for better test output
+pytest-sugar>=0.9.7

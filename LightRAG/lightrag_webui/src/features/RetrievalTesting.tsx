@@ -7,7 +7,6 @@ import { errorMessage } from '@/lib/utils'
 import { useSettingsStore } from '@/stores/settings'
 import { useDebounce } from '@/hooks/useDebounce'
 import QuerySettings from '@/components/retrieval/QuerySettings'
-import GraphFilterPanel from '@/components/graph/GraphFilterPanel'
 import { ChatMessage, MessageWithError } from '@/components/retrieval/ChatMessage'
 import { EraserIcon, SendIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -441,11 +440,6 @@ export default function RetrievalTesting() {
     <div className="flex size-full gap-2 px-2 pb-12 overflow-hidden">
       <div className="flex grow flex-col gap-4">
         <div className="relative grow">
-          {/* Doc Filter Button - positioned absolutely in top-right */}
-          <div className="absolute top-2 right-2 z-10">
-            <GraphFilterPanel />
-          </div>
-
           <div
             ref={messagesContainerRef}
             className="bg-primary-foreground/60 absolute inset-0 flex flex-col overflow-auto rounded-lg border p-2"

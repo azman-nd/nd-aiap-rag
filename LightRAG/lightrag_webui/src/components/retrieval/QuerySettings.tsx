@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useSettingsStore } from '@/stores/settings'
 import { useTranslation } from 'react-i18next'
 import { RotateCcw } from 'lucide-react'
+import GraphFilterPanel from '@/components/graph/GraphFilterPanel'
 
 export default function QuerySettings() {
   const { t } = useTranslation()
@@ -466,6 +467,14 @@ export default function QuerySettings() {
                 />
               </div>
             </>
+
+            {/* Document Filters */}
+            <div className="pt-2 border-t border-border">
+              <div className="space-y-2">
+                <label className="ml-1 text-sm font-medium">Document Filters</label>
+                <GraphFilterPanel />
+              </div>
+            </div>
 
           </div>
         </div>
