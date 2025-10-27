@@ -159,6 +159,9 @@ class QueryParam:
     Default is True to enable reranking when rerank model is available.
     """
 
+    ids: list[str] | None = None
+    """Optional list of document IDs to scope retrieval to."""
+
 
 @dataclass
 class StorageNameSpace(ABC):

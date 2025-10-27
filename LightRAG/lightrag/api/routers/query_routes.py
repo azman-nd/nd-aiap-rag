@@ -254,7 +254,7 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
         return len(accessible_ids) > 0
 
     @router.post(
-        "/query", response_model=QueryResponse, dependencies=[Depends(combined_auth)]
+        "/query_nofilter", response_model=QueryResponse, dependencies=[Depends(combined_auth)]
     )
     async def query_text(
         request: QueryRequest,
@@ -262,6 +262,9 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
     ):
         """
         Handle a POST request at the /query endpoint to process user queries using RAG capabilities.
+        Metadata based filtering mechanism populates QueryParam.ids with the accessible document IDs 
+        and pass to LightRAG. However, LighRAG do not use ids to scope its search for now.
+        TODO: change LightRAG to honor the ids filter.
 
         Parameters:
             request (QueryRequest): The request object containing the query parameters.
@@ -324,49 +327,18 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
 
             response = await rag.aquery(request.query, param=param)
 
-            if isinstance(response, dict):
-                filtered_chunks = await filter_chunks_by_access(
-                    response.get("chunks", []),
-                    accessible_docs,
-                )
-                filtered_entities = await filter_entities_by_access(
-                    response.get("entities", []),
-                    accessible_docs,
-                )
-                filtered_relationships = await filter_entities_by_access(
-                    response.get("relationships", []),
-                    accessible_docs,
-                )
-
-                response["chunks"] = filtered_chunks
-                response["entities"] = filtered_entities
-                response["relationships"] = filtered_relationships
-
-                metadata = response.get("metadata") or {}
-                accessible_paths = [
-                    path for path in (doc_file_path(status) for status in accessible_docs.values()) if path
-                ]
-                metadata.update(
-                    {
-                        "accessible_files": accessible_paths,
-                        "total_accessible_files": len(accessible_docs),
-                        "applied_filters": filters.__dict__,
-                    }
-                )
-                response["metadata"] = metadata
-
-                result = json.dumps(response, indent=2)
-                return QueryResponse(response=result)
-
             if isinstance(response, str):
                 return QueryResponse(response=response)
+
+            if isinstance(response, dict):
+                return QueryResponse(response=json.dumps(response, indent=2))
 
             return QueryResponse(response=str(response))
         except Exception as e:
             trace_exception(e)
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.post("/query/stream", dependencies=[Depends(combined_auth)])
+    @router.post("/query_nofilter/stream", dependencies=[Depends(combined_auth)])
     async def query_text_stream(
         request: QueryRequest,
         current_user: CurrentUser = Depends(get_current_user_optional),
@@ -499,7 +471,7 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
         """
         try:
             param = request.to_query_params(False)  # No streaming for data endpoint
-            logger.info("AZ >> /query/data invoked with params {parma}")
+            logger.info(f"AZ >> /query/data invoked with params {param}")
             filters = build_access_filters(request.access_filters)
             accessible_docs = await get_user_accessible_files(
                 rag.doc_status,
@@ -534,28 +506,27 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
 
             # The aquery_data method returns a dict with entities, relationships, chunks, and metadata
             if isinstance(response, dict):
-                # Ensure all required fields exist and are lists/dicts
-                entities = await filter_entities_by_access(
+                # Filter response to only include data from accessible documents
+                filtered_chunks = await filter_chunks_by_access(
+                    response.get("chunks", []),
+                    accessible_docs,
+                )
+                filtered_entities = await filter_entities_by_access(
                     response.get("entities", []),
                     accessible_docs,
                 )
-                relationships = await filter_entities_by_access(
+                filtered_relationships = await filter_entities_by_access(
                     response.get("relationships", []),
-                    accessible_docs,
-                )
-                chunks = await filter_chunks_by_access(
-                    response.get("chunks", []),
                     accessible_docs,
                 )
                 metadata = response.get("metadata", {})
 
-                # Validate data types
-                if not isinstance(entities, list):
-                    entities = []
-                if not isinstance(relationships, list):
-                    relationships = []
-                if not isinstance(chunks, list):
-                    chunks = []
+                if not isinstance(filtered_entities, list):
+                    filtered_entities = []
+                if not isinstance(filtered_relationships, list):
+                    filtered_relationships = []
+                if not isinstance(filtered_chunks, list):
+                    filtered_chunks = []
                 if not isinstance(metadata, dict):
                     metadata = {}
 
@@ -571,22 +542,21 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                 )
 
                 return QueryDataResponse(
-                    entities=entities,
-                    relationships=relationships,
-                    chunks=chunks,
+                    entities=filtered_entities,
+                    relationships=filtered_relationships,
+                    chunks=filtered_chunks,
                     metadata=metadata,
                 )
-            else:
-                # Fallback for unexpected response format
-                return QueryDataResponse(
-                    entities=[],
-                    relationships=[],
-                    chunks=[],
-                    metadata={
-                        "error": "Unexpected response format",
-                        "raw_response": str(response),
-                    },
-                )
+
+            return QueryDataResponse(
+                entities=[],
+                relationships=[],
+                chunks=[],
+                metadata={
+                    "error": "Unexpected response format",
+                    "raw_response": str(response),
+                },
+            )
         except Exception as e:
             trace_exception(e)
             raise HTTPException(status_code=500, detail=str(e))

@@ -810,6 +810,8 @@ async def query_with_access_control(
             # For now, return filtered context
             pass
         
+        # TODO: Drop this post-filter once LightRAG retrieval respects param.ids directly
+        
         return {
             "entities": filtered_entities,
             "relationships": filtered_relationships,
