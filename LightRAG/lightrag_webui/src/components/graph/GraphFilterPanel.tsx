@@ -22,9 +22,10 @@ import { MetadataTag, getDocumentsList, getProjectsList } from '@/api/lightrag'
 
 interface GraphFilterPanelProps {
   className?: string
+  disabled?: boolean
 }
 
-const GraphFilterPanel: React.FC<GraphFilterPanelProps> = ({ className = '' }) => {
+const GraphFilterPanel: React.FC<GraphFilterPanelProps> = ({ className = '', disabled = false }) => {
   // Document filters
   const [projectId, setProjectId] = useState('')
   const [selectedFilename, setSelectedFilename] = useState('')
@@ -170,6 +171,7 @@ const GraphFilterPanel: React.FC<GraphFilterPanelProps> = ({ className = '' }) =
           variant="outline"
           size="sm"
           onClick={() => setIsExpanded(true)}
+          disabled={disabled}
           className={`h-[52px] w-full px-3 gap-1.5 border-2 ${
             activeFilterCount > 0
               ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900 dark:border-blue-700 dark:text-blue-300'

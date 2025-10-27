@@ -254,7 +254,7 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
         return len(accessible_ids) > 0
 
     @router.post(
-        "/query_nofilter", response_model=QueryResponse, dependencies=[Depends(combined_auth)]
+        "/query", response_model=QueryResponse, dependencies=[Depends(combined_auth)]
     )
     async def query_text(
         request: QueryRequest,
@@ -338,7 +338,7 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
             trace_exception(e)
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.post("/query_nofilter/stream", dependencies=[Depends(combined_auth)])
+    @router.post("/query/stream", dependencies=[Depends(combined_auth)])
     async def query_text_stream(
         request: QueryRequest,
         current_user: CurrentUser = Depends(get_current_user_optional),
