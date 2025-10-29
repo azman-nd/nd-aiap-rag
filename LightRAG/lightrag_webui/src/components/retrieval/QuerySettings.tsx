@@ -472,7 +472,8 @@ export default function QuerySettings() {
             <div className="pt-2 border-t border-border">
               <div className="space-y-2">
                 <label className="ml-1 text-sm font-medium">Document Filters</label>
-                <GraphFilterPanel disabled={!querySettings.only_need_context} />
+                {/* <GraphFilterPanel disabled={!querySettings.only_need_context} /> */}
+                <GraphFilterPanel disabled={false} />
               </div>
             </div>
 

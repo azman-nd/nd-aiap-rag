@@ -137,7 +137,11 @@ class NanoVectorDBStorage(BaseVectorStorage):
             )
 
     async def query(
-        self, query: str, top_k: int, query_embedding: list[float] = None
+        self, 
+        query: str, 
+        top_k: int, 
+        query_embedding: list[float] = None,
+        filter_chunk_ids: list[str] | None = None
     ) -> list[dict[str, Any]]:
         # Use provided embedding or compute it
         if query_embedding is not None:
@@ -150,11 +154,19 @@ class NanoVectorDBStorage(BaseVectorStorage):
             embedding = embedding[0]
 
         client = await self._get_client()
+        filter_lambda = None
+        logger.debug(f"Filter doc ids: {filter_chunk_ids}")
+        if filter_chunk_ids:
+            filter_set = set(filter_chunk_ids)
+            filter_lambda = lambda rec: bool(rec.get("source_id") in filter_set)
+
         results = client.query(
             query=embedding,
             top_k=top_k,
             better_than_threshold=self.cosine_better_than_threshold,
+            filter_lambda=filter_lambda
         )
+        
         results = [
             {
                 **{k: v for k, v in dp.items() if k != "vector"},

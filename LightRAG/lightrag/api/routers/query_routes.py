@@ -16,12 +16,9 @@ from ..access_control import (
     CurrentUser,
     Permission,
     doc_file_path,
-    filter_chunks_by_access,
-    filter_entities_by_access,
     get_current_user_optional,
     get_user_accessible_files,
     normalize_tag_items,
-    query_with_access_control,
 )
 from pydantic import BaseModel, Field, field_validator
 
@@ -236,22 +233,16 @@ class QueryDataResponse(BaseModel):
 def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
     combined_auth = get_combined_auth_dependency(api_key)
 
-    def apply_doc_id_filter(param: QueryParam, accessible_docs: dict[str, Any]) -> bool:
-        """
-        Limit QueryParam.ids to documents the caller can access.
-
-        Returns:
-            bool: True if any accessible document IDs remain after filtering.
-        """
+    def apply_doc_id_filter(param: QueryParam, accessible_docs: dict[str, Any]) -> None:
+        """Set QueryParam.ids based on accessible documents and client request."""
         accessible_ids = list(accessible_docs.keys())
 
         if param.ids:
-            filtered_ids = [doc_id for doc_id in param.ids if doc_id in accessible_docs]
-            param.ids = filtered_ids
-            return len(filtered_ids) > 0
-
-        param.ids = accessible_ids
-        return len(accessible_ids) > 0
+            # Client provided specific IDs - intersect with accessible docs
+            param.ids = [doc_id for doc_id in param.ids if doc_id in accessible_docs]
+        else:
+            # No client filter - use all accessible docs
+            param.ids = accessible_ids
 
     @router.post(
         "/query", response_model=QueryResponse, dependencies=[Depends(combined_auth)]
@@ -262,9 +253,11 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
     ):
         """
         Handle a POST request at the /query endpoint to process user queries using RAG capabilities.
-        Metadata based filtering mechanism populates QueryParam.ids with the accessible document IDs 
-        and pass to LightRAG. However, LighRAG do not use ids to scope its search for now.
-        TODO: change LightRAG to honor the ids filter.
+        
+        Document ID filtering: The system now filters results by document IDs during retrieval.
+        - Vector databases filter chunks by full_doc_id field (supported in Milvus, MongoDB, PostgreSQL, Qdrant, Faiss, NanoVectorDB)
+        - Graph databases filter entities/relationships by their source_id (chunk IDs) 
+        - See _get_chunk_ids_for_doc_ids() in operate.py for the doc_id → chunk_id mapping logic
 
         Parameters:
             request (QueryRequest): The request object containing the query parameters.
@@ -281,17 +274,6 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
             param = request.to_query_params(False)
             filters = build_access_filters(request.access_filters)
 
-            # When the caller only needs context, leverage the dedicated helper
-            if request.only_need_context:
-                context_result = await query_with_access_control(
-                    rag=rag,
-                    query=request.query,
-                    current_user=current_user,
-                    param=param,
-                    filters=filters,
-                )
-                return QueryResponse(response=json.dumps(context_result, indent=2))
-
             accessible_docs = await get_user_accessible_files(
                 rag.doc_status,
                 current_user,
@@ -302,13 +284,6 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                 required_permission=Permission.VIEW,
             )
             
-            # Apply filename filter if provided (post-filter accessible docs)
-            if filters.filename:
-                accessible_docs = {
-                    doc_id: status for doc_id, status in accessible_docs.items()
-                    if filters.filename in (doc_file_path(status) or '')
-                }
-
             if not accessible_docs:
                 detail = (
                     "No accessible documents found for the provided metadata filters."
@@ -317,14 +292,9 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                 )
                 return QueryResponse(response=detail)
 
-            if not apply_doc_id_filter(param, accessible_docs):
-                detail = (
-                    "No accessible documents found for the provided metadata filters."
-                    if current_user.is_authenticated
-                    else "Please authenticate or provide appropriate metadata to access documents."
-                )
-                return QueryResponse(response=detail)
+            apply_doc_id_filter(param, accessible_docs)
 
+            logger.info(f"[query_text] Invoking rag.aquery() with param.ids={param.ids}")
             response = await rag.aquery(request.query, param=param)
 
             if isinstance(response, str):
@@ -357,29 +327,6 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
             param = request.to_query_params(True)
             filters = build_access_filters(request.access_filters)
 
-            if request.only_need_context:
-                context_result = await query_with_access_control(
-                    rag=rag,
-                    query=request.query,
-                    current_user=current_user,
-                    param=param,
-                    filters=filters,
-                )
-
-                async def single_payload():
-                    yield f"{json.dumps(context_result)}\n"
-
-                return StreamingResponse(
-                    single_payload(),
-                    media_type="application/x-ndjson",
-                    headers={
-                        "Cache-Control": "no-cache",
-                        "Connection": "keep-alive",
-                        "Content-Type": "application/x-ndjson",
-                        "X-Accel-Buffering": "no",
-                    },
-                )
-
             accessible_docs = await get_user_accessible_files(
                 rag.doc_status,
                 current_user,
@@ -390,25 +337,15 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                 required_permission=Permission.VIEW,
             )
             
-            # Apply filename filter if provided (post-filter accessible docs)
-            if filters.filename:
-                accessible_docs = {
-                    doc_id: status for doc_id, status in accessible_docs.items()
-                    if filters.filename in (doc_file_path(status) or '')
-                }
-
             if not accessible_docs:
                 raise HTTPException(
                     status_code=403,
                     detail="No accessible documents found for the provided metadata filters.",
                 )
 
-            if not apply_doc_id_filter(param, accessible_docs):
-                raise HTTPException(
-                    status_code=403,
-                    detail="No accessible documents found for the provided metadata filters.",
-                )
+            apply_doc_id_filter(param, accessible_docs)
 
+            logger.info(f"[query_text_stream] Invoking rag.aquery() with param.ids={param.ids}")
             response = await rag.aquery(request.query, param=param)
 
             async def stream_generator():
@@ -471,7 +408,6 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
         """
         try:
             param = request.to_query_params(False)  # No streaming for data endpoint
-            logger.info(f"AZ >> /query/data invoked with params {param}")
             filters = build_access_filters(request.access_filters)
             accessible_docs = await get_user_accessible_files(
                 rag.doc_status,
@@ -483,42 +419,24 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                 required_permission=Permission.VIEW,
             )
             
-            # Apply filename filter if provided (post-filter accessible docs)
-            if filters.filename:
-                accessible_docs = {
-                    doc_id: status for doc_id, status in accessible_docs.items()
-                    if filters.filename in (doc_file_path(status) or '')
-                }
-
             if not accessible_docs:
                 raise HTTPException(
                     status_code=403,
                     detail="No accessible documents found for the provided metadata filters.",
                 )
 
-            if not apply_doc_id_filter(param, accessible_docs):
-                raise HTTPException(
-                    status_code=403,
-                    detail="No accessible documents found for the provided metadata filters.",
-                )
+            apply_doc_id_filter(param, accessible_docs)
 
+            logger.info(f"[query_data] Invoking rag.aquery_data() with param.ids={param.ids}")
             response = await rag.aquery_data(request.query, param=param)
 
             # The aquery_data method returns a dict with entities, relationships, chunks, and metadata
+            # No need to post-filter since filtering happens during retrieval via param.ids
             if isinstance(response, dict):
-                # Filter response to only include data from accessible documents
-                filtered_chunks = await filter_chunks_by_access(
-                    response.get("chunks", []),
-                    accessible_docs,
-                )
-                filtered_entities = await filter_entities_by_access(
-                    response.get("entities", []),
-                    accessible_docs,
-                )
-                filtered_relationships = await filter_entities_by_access(
-                    response.get("relationships", []),
-                    accessible_docs,
-                )
+                # Results are already filtered by param.ids during retrieval
+                filtered_chunks = response.get("chunks", [])
+                filtered_entities = response.get("entities", [])
+                filtered_relationships = response.get("relationships", [])
                 metadata = response.get("metadata", {})
 
                 if not isinstance(filtered_entities, list):

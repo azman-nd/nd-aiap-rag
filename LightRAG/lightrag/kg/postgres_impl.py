@@ -2004,7 +2004,11 @@ class PGVectorStorage(BaseVectorStorage):
 
     #################### query method ###############
     async def query(
-        self, query: str, top_k: int, query_embedding: list[float] = None
+        self, 
+        query: str, 
+        top_k: int, 
+        query_embedding: list[float] = None,
+        filter_doc_ids: list[str] | None = None
     ) -> list[dict[str, Any]]:
         if query_embedding is not None:
             embedding = query_embedding
@@ -2016,13 +2020,24 @@ class PGVectorStorage(BaseVectorStorage):
 
         embedding_string = ",".join(map(str, embedding))
 
-        sql = SQL_TEMPLATES[self.namespace].format(embedding_string=embedding_string)
+        # Build SQL with optional doc ID filter
+        sql_template = SQL_TEMPLATES[self.namespace].format(embedding_string=embedding_string)
+        
+        # Add WHERE clause for doc ID filtering if provided
+        if filter_doc_ids:
+            doc_ids_str = ",".join([f"'{doc_id}'" for doc_id in filter_doc_ids])
+            # Insert the filter after WHERE workspace = clause
+            sql_template = sql_template.replace(
+                "WHERE c.workspace = $1",
+                f"WHERE c.workspace = $1 AND c.full_doc_id IN ({doc_ids_str})"
+            )
+        
         params = {
             "workspace": self.workspace,
             "closer_than_threshold": 1 - self.cosine_better_than_threshold,
             "top_k": top_k,
         }
-        results = await self.db.query(sql, params=list(params.values()), multirows=True)
+        results = await self.db.query(sql_template, params=list(params.values()), multirows=True)
         return results
 
     async def index_done_callback(self) -> None:

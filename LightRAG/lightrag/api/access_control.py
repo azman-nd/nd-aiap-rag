@@ -459,6 +459,8 @@ def metadata_matches_filters(metadata: Dict[str, Any], filters: AccessFilters) -
             expected = (tag_filter.get("name"), tag_filter.get("value", ""))
             if expected not in doc_lookup:
                 return False
+    # Note: filename filtering is handled separately in get_user_accessible_files
+    # by checking the DocProcessingStatus.file_path field after metadata matching
     return True
 
 
@@ -536,6 +538,16 @@ async def get_user_accessible_files(
                 f"tags={metadata_tags(metadata)}"
             )
             continue
+
+        # Apply filename filter if provided (checks doc_status.file_path field)
+        if filters.filename:
+            file_path = doc_file_path(doc_status)
+            if not file_path or filters.filename not in file_path:
+                logger.info(
+                    f"DEBUG get_user_accessible_files: Doc {doc_id} EXCLUDED by filename filter. "
+                    f"Expected '{filters.filename}' in '{file_path}'"
+                )
+                continue
 
         # Check if document is public (no access control)
         is_public = bool(metadata.get("is_public", False))
@@ -680,154 +692,3 @@ def doc_file_path(doc_status: Any) -> Optional[str]:
         value = doc_status.get("file_path")
     return value
 
-
-async def query_with_access_control(
-    rag,
-    query: str,
-    current_user: CurrentUser,
-    project_id: Optional[str] = None,
-    param=None,
-    include_shared: bool = True,
-    include_public: bool = True,
-    filters: Optional[AccessFilters] = None,
-):
-    """
-    Execute RAG query with automatic access control filtering
-    
-    This is the main function for executing queries with access control.
-    It performs the following steps:
-    1. Get list of files user can access
-    2. Execute RAG query to get context
-    3. Filter results (chunks, entities, relationships) by access
-    4. Return filtered results
-    
-    Args:
-        rag: LightRAG instance
-        query: User's query string
-        current_user: Current user from JWT (may be unauthenticated)
-        project_id: Optional project ID for scoping
-        param: QueryParam object for query configuration
-        include_shared: Include documents shared with user
-        include_public: Include public documents
-        
-    Returns:
-        Filtered query results dictionary
-        
-    Example:
-        result = await query_with_access_control(
-            rag=rag,
-            query="What is our Q1 revenue?",
-            current_user=current_user,
-            project_id="finance_2024",
-            param=QueryParam(mode="hybrid"),
-            include_shared=True,
-            include_public=False
-        )
-    """
-    if param is None:
-        param = QueryParam()
-    
-    # Step 1: Get user's accessible files
-    filters = filters or AccessFilters(project_id=project_id)
-
-    accessible_files = await get_user_accessible_files(
-        rag.doc_status,
-        current_user,
-        project_id=filters.project_id,
-        include_shared=include_shared,
-        include_public=include_public,
-        filters=filters,
-    )
-    
-    # Apply filename filter if provided (post-filter accessible docs)
-    if filters.filename:
-        accessible_files = {
-            doc_id: status for doc_id, status in accessible_files.items()
-            if filters.filename in (doc_file_path(status) or '')
-        }
-    
-    # No accessible documents
-    if not accessible_files:
-        return {
-            "response": "No accessible documents found." if current_user.is_authenticated
-                       else "Please login to access documents.",
-            "entities": [],
-            "relationships": [],
-            "chunks": [],
-            "metadata": {
-                "accessible_files": [],
-                "user_authenticated": current_user.is_authenticated,
-                "user_id": current_user.user_id if current_user.is_authenticated else None,
-            }
-        }
-    
-    accessible_ids = list(accessible_files.keys())
-    if getattr(param, "ids", None):
-        param.ids = [doc_id for doc_id in param.ids if doc_id in accessible_files]
-    else:
-        param.ids = accessible_ids
-
-    if not param.ids:
-        return {
-            "response": "No accessible documents found." if current_user.is_authenticated
-                       else "Please login to access documents.",
-            "entities": [],
-            "relationships": [],
-            "chunks": [],
-            "metadata": {
-                "accessible_files": [
-                    path for path in (doc_file_path(status) for status in accessible_files.values()) if path
-                ],
-                "user_authenticated": current_user.is_authenticated,
-                "user_id": current_user.user_id if current_user.is_authenticated else None,
-                "project_id": filters.project_id,
-            }
-        }
-    
-    # Step 2: Execute query with context retrieval
-    original_only_context = param.only_need_context
-    param.only_need_context = True
-    raw_result = await rag.aquery(query, param)
-    
-    # Step 3: Filter results by accessible files
-    if isinstance(raw_result, dict):
-        filtered_chunks = await filter_chunks_by_access(
-            raw_result.get("chunks", []),
-            accessible_files
-        )
-        filtered_entities = await filter_entities_by_access(
-            raw_result.get("entities", []),
-            accessible_files
-        )
-        filtered_relationships = await filter_entities_by_access(
-            raw_result.get("relationships", []),
-            accessible_files
-        )
-        
-        # If user wants full response (not just context), generate it with filtered context
-        if not original_only_context:
-            # TODO: Re-generate LLM response with filtered context
-            # For now, return filtered context
-            pass
-        
-        # TODO: Drop this post-filter once LightRAG retrieval respects param.ids directly
-        
-        return {
-            "entities": filtered_entities,
-            "relationships": filtered_relationships,
-            "chunks": filtered_chunks,
-            "metadata": {
-                "accessible_files": [
-                    path for path in (doc_file_path(status) for status in accessible_files.values()) if path
-                ],
-                "total_accessible_files": len(accessible_files),
-                "total_chunks": len(filtered_chunks),
-                "total_entities": len(filtered_entities),
-                "total_relationships": len(filtered_relationships),
-                "user_id": current_user.user_id if current_user.is_authenticated else None,
-                "user_authenticated": current_user.is_authenticated,
-                "project_id": filters.project_id,
-            }
-        }
-    
-    return raw_result

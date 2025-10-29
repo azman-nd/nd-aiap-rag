@@ -1047,7 +1047,11 @@ class MilvusVectorDBStorage(BaseVectorStorage):
         return results
 
     async def query(
-        self, query: str, top_k: int, query_embedding: list[float] = None
+        self, 
+        query: str, 
+        top_k: int, 
+        query_embedding: list[float] = None,
+        filter_doc_ids: list[str] | None = None
     ) -> list[dict[str, Any]]:
         # Ensure collection is loaded before querying
         self._ensure_collection_loaded()
@@ -1063,11 +1067,19 @@ class MilvusVectorDBStorage(BaseVectorStorage):
         # Include all meta_fields (created_at is now always included)
         output_fields = list(self.meta_fields)
 
+        # Build filter expression if doc IDs provided
+        filter_expr = None
+        if filter_doc_ids:
+            # Milvus filter syntax: full_doc_id in ["doc-abc", "doc-xyz"]
+            doc_list = '", "'.join(filter_doc_ids)
+            filter_expr = f'full_doc_id in ["{doc_list}"]'
+
         results = self._client.search(
             collection_name=self.final_namespace,
             data=embedding,
             limit=top_k,
             output_fields=output_fields,
+            filter=filter_expr,  # Apply filter if provided
             search_params={
                 "metric_type": "COSINE",
                 "params": {"radius": self.cosine_better_than_threshold},
