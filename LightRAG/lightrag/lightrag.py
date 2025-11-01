@@ -2734,7 +2734,9 @@ class LightRAG:
                         f"Deleting {doc_id} {file_path}(previous status: FAILED)"
                     )
                 else:
-                    warning_msg = f"Deleting {doc_id} {file_path}(previous status: {doc_status})"
+                    warning_msg = (
+                        f"Deleting {doc_id} {file_path}(previous status: {doc_status})"
+                    )
                 logger.info(warning_msg)
                 # Update pipeline status for monitoring
                 async with pipeline_status_lock:
