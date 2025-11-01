@@ -220,7 +220,8 @@ class BaseVectorStorage(StorageNameSpace, ABC):
         query: str, 
         top_k: int, 
         query_embedding: list[float] = None,
-        filter_doc_ids: list[str] | None = None
+        filterby_ids: list[str] | None = None,
+        filter_type: Literal["chunk", "document"] | None = None
     ) -> list[dict[str, Any]]:
         """Query the vector storage and retrieve top_k results.
 

@@ -2,7 +2,7 @@ import asyncio
 import base64
 import os
 import zlib
-from typing import Any, final
+from typing import Any, final, Literal
 from dataclasses import dataclass
 import numpy as np
 import time
@@ -141,7 +141,8 @@ class NanoVectorDBStorage(BaseVectorStorage):
         query: str, 
         top_k: int, 
         query_embedding: list[float] = None,
-        filter_chunk_ids: list[str] | None = None
+        filterby_ids: list[str] | None = None,
+        filter_type: Literal["chunk", "document"] | None = None
     ) -> list[dict[str, Any]]:
         # Use provided embedding or compute it
         if query_embedding is not None:
@@ -155,10 +156,15 @@ class NanoVectorDBStorage(BaseVectorStorage):
 
         client = await self._get_client()
         filter_lambda = None
-        logger.debug(f"Filter doc ids: {filter_chunk_ids}")
-        if filter_chunk_ids:
-            filter_set = set(filter_chunk_ids)
-            filter_lambda = lambda rec: bool(rec.get("source_id") in filter_set)
+        logger.debug(f"Filter ids: {filterby_ids}")
+        if filterby_ids:
+            filter_set = set(filterby_ids)
+            if filter_type == "document":
+                filter_lambda = lambda rec: bool(rec.get("full_doc_id") in filter_set)
+            elif filter_type == "chunk":
+                filter_lambda = lambda rec: bool(rec.get("source_id") in filter_set)
+            else:
+                raise ValueError(f"Invalid filter type: {filter_type}")
 
         results = client.query(
             query=embedding,

@@ -2713,12 +2713,13 @@ async def _get_vector_context(
         search_top_k = query_param.chunk_top_k or query_param.top_k
         cosine_threshold = chunks_vdb.cosine_better_than_threshold
 
-        # Pass filter_doc_ids to enable document-level filtering
+        # Pass filterby_ids to enable document-level filtering
         results = await chunks_vdb.query(
             query, 
             top_k=search_top_k, 
             query_embedding=query_embedding,
-            filter_doc_ids=query_param.ids  # Pass doc IDs for filtering
+            filterby_ids=query_param.ids,  # Pass doc IDs for filtering
+            filter_type="document"
         )
         if not results:
             logger.info(
@@ -3599,7 +3600,7 @@ async def _get_node_data(
         f"Query nodes: {query} (top_k:{query_param.top_k}, cosine:{entities_vdb.cosine_better_than_threshold})"
     )
 
-    results = await entities_vdb.query(query, top_k=query_param.top_k, filter_chunk_ids=filter_chunk_ids)
+    results = await entities_vdb.query(query, top_k=query_param.top_k, filterby_ids=filter_chunk_ids, filter_type="chunk")
 
     if not len(results):
         return [], []
@@ -3876,7 +3877,7 @@ async def _get_edge_data(
         f"Query edges: {keywords} (top_k:{query_param.top_k}, cosine:{relationships_vdb.cosine_better_than_threshold})"
     )
 
-    results = await relationships_vdb.query(keywords, top_k=query_param.top_k, filter_chunk_ids=filter_chunk_ids)
+    results = await relationships_vdb.query(keywords, top_k=query_param.top_k, filterby_ids=filter_chunk_ids, filter_type="chunk")
 
     if not len(results):
         return [], []

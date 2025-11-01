@@ -53,8 +53,7 @@ DEFAULT_KG_CHUNK_PICK_METHOD = "VECTOR"
 DEFAULT_HISTORY_TURNS = 0
 
 # Rerank configuration defaults
-# DEFAULT_MIN_RERANK_SCORE = 0.0
-DEFAULT_MIN_RERANK_SCORE = 0.1
+DEFAULT_MIN_RERANK_SCORE = 0.0
 DEFAULT_RERANK_BINDING = "null"
 
 # File path configuration for vector and graph database(Should not be changed, used in Milvus Schema)
