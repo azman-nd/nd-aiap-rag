@@ -513,7 +513,7 @@ Modify RAGAnything and LightRAG core to accept metadata parameter.
 
 **Why**: Allow programmatic metadata assignment (not just through API).
 
-**Files**: 
+**Files**:
 - `raganything/processor.py`
 - `LightRAG/lightrag/lightrag.py`
 
@@ -547,7 +547,7 @@ oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="login", auto_error=False
 class CurrentUser:
     """
     Container for current user information extracted from JWT token
-    
+
     Attributes:
         username: Username from token
         user_id: Unique user identifier (from metadata or username)
@@ -555,7 +555,7 @@ class CurrentUser:
         metadata: Additional metadata from token
         is_authenticated: Whether user has valid authentication
     """
-    
+
     def __init__(
         self,
         username: Optional[str] = None,
@@ -569,19 +569,19 @@ class CurrentUser:
         self.role = role
         self.metadata = metadata or {}
         self.is_authenticated = is_authenticated
-    
+
     def has_role(self, role: str) -> bool:
         """
         Check if user has a specific role
-        
+
         Args:
             role: Role name to check
-            
+
         Returns:
             True if user has the role
         """
         return self.role == role or role in self.metadata.get("roles", [])
-    
+
     def __repr__(self):
         return f"CurrentUser(user_id={self.user_id}, role={self.role}, authenticated={self.is_authenticated})"
 
@@ -591,17 +591,17 @@ async def get_current_user_optional(
 ) -> CurrentUser:
     """
     Extract user information from JWT token (OPTIONAL - doesn't fail if no token)
-    
+
     This function is used as a FastAPI dependency to extract user information
     from the JWT token in the Authorization header. If no token is provided
     or the token is invalid, returns an unauthenticated guest user.
-    
+
     Args:
         token: JWT token from Authorization header (automatically extracted)
-        
+
     Returns:
         CurrentUser object (may be unauthenticated)
-        
+
     Example:
         @router.post("/endpoint")
         async def endpoint(current_user: CurrentUser = Depends(get_current_user_optional)):
@@ -613,11 +613,11 @@ async def get_current_user_optional(
     # No token provided - unauthenticated user
     if not token:
         return CurrentUser(is_authenticated=False, role="guest")
-    
+
     try:
         # Use existing auth_handler to validate token
         token_info = auth_handler.validate_token(token)
-        
+
         # Extract user information from token
         # token_info = {"username": str, "role": str, "metadata": dict, "exp": datetime}
         return CurrentUser(
@@ -627,7 +627,7 @@ async def get_current_user_optional(
             metadata=token_info.get("metadata", {}),
             is_authenticated=True
         )
-        
+
     except Exception:
         # Invalid token - treat as unauthenticated (don't raise error for optional auth)
         return CurrentUser(is_authenticated=False, role="guest")
@@ -638,19 +638,19 @@ async def get_current_user_required(
 ) -> CurrentUser:
     """
     Extract user information from JWT token (REQUIRED - fails if no valid token)
-    
+
     This function is used as a FastAPI dependency for endpoints that require
     authentication. Raises 401 Unauthorized if no token or invalid token.
-    
+
     Args:
         token: JWT token from Authorization header (automatically extracted)
-        
+
     Returns:
         CurrentUser object (always authenticated)
-        
+
     Raises:
         HTTPException: 401 if no token or invalid token
-        
+
     Example:
         @router.post("/protected-endpoint")
         async def endpoint(current_user: CurrentUser = Depends(get_current_user_required)):
@@ -662,10 +662,10 @@ async def get_current_user_required(
             detail="Authentication required",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     # Validate token (will raise HTTPException if invalid)
     token_info = auth_handler.validate_token(token)
-    
+
     # Extract user information
     return CurrentUser(
         username=token_info.get("username"),
@@ -685,24 +685,24 @@ async def get_user_accessible_files(
 ) -> list[str]:
     """
     Get list of file_paths that user can access based on access control
-    
+
     This function filters documents based on:
     - Ownership (user owns the document)
     - Access control lists (user is in viewers or editors)
     - Role-based access (user has required role)
     - Public access (document is marked as public)
     - Project scoping (optional filter by project)
-    
+
     Args:
         doc_status_storage: Document status storage instance
         current_user: Current user from JWT token (may be unauthenticated)
         project_id: Optional project ID to filter documents
         include_shared: Include documents shared with user (default: True)
         include_public: Include public documents (default: True)
-        
+
     Returns:
         List of file_path strings user has access to
-        
+
     Example:
         accessible_files = await get_user_accessible_files(
             rag.doc_status,
@@ -715,54 +715,54 @@ async def get_user_accessible_files(
     """
     # Get all processed documents
     all_docs = await doc_status_storage.get_docs_by_status(DocStatus.PROCESSED)
-    
+
     accessible_files = []
-    
+
     for doc_id, doc_status in all_docs.items():
         metadata = doc_status.metadata
-        
+
         # Check if document is public (no access control)
         is_public = metadata.get("is_public", False)
-        
+
         # Unauthenticated users can only see public documents
         if not current_user.is_authenticated:
             if is_public and include_public:
                 accessible_files.append(doc_status.file_path)
             continue
-        
+
         # Authenticated user access checks
         user_id = current_user.user_id
-        
+
         # Check ownership
         is_owner = metadata.get("user_id") == user_id
-        
+
         # Check access control list
         access_control = metadata.get("access_control", {})
         is_viewer = user_id in access_control.get("viewers", [])
         is_editor = user_id in access_control.get("editors", [])
-        
+
         # Check role-based access
         allowed_roles = metadata.get("allowed_roles", [])
         has_role_access = any(
             current_user.has_role(role) for role in allowed_roles
         ) if allowed_roles else False
-        
+
         # Determine if user has access
         has_access = (
-            is_owner or 
+            is_owner or
             (include_shared and (is_viewer or is_editor)) or
             has_role_access or
             (is_public and include_public)
         )
-        
+
         # Apply project scoping (if specified)
         if project_id:
             in_project = metadata.get("project_id") == project_id
             has_access = has_access and in_project
-        
+
         if has_access:
             accessible_files.append(doc_status.file_path)
-    
+
     return accessible_files
 
 
@@ -772,17 +772,17 @@ async def filter_chunks_by_access(
 ) -> list[dict]:
     """
     Filter chunks to only those from accessible files
-    
+
     Args:
         chunks: List of chunk dictionaries with file_path field
         accessible_files: List of file_path strings user can access
-        
+
     Returns:
         Filtered list of chunks
     """
     return [
         chunk for chunk in chunks
-        if any(accessible_file in chunk.get("file_path", "") 
+        if any(accessible_file in chunk.get("file_path", "")
                for accessible_file in accessible_files)
     ]
 
@@ -793,15 +793,15 @@ async def filter_entities_by_access(
 ) -> list[dict]:
     """
     Filter entities to only those from accessible files
-    
+
     Entities can have multiple file_paths (when entity appears in multiple documents)
     separated by GRAPH_FIELD_SEP ("<SEP>"). An entity is accessible if ANY of its
     file_paths are accessible.
-    
+
     Args:
         entities: List of entity dictionaries with file_path field
         accessible_files: List of file_path strings user can access
-        
+
     Returns:
         Filtered list of entities
     """
@@ -809,13 +809,13 @@ async def filter_entities_by_access(
     for entity in entities:
         # Entities can have multiple file_paths separated by <SEP>
         entity_file_paths = entity.get("file_path", "").split(GRAPH_FIELD_SEP)
-        
+
         # Check if ANY of the entity's file_paths are accessible
-        if any(accessible_file in fp 
-               for fp in entity_file_paths 
+        if any(accessible_file in fp
+               for fp in entity_file_paths
                for accessible_file in accessible_files):
             filtered.append(entity)
-    
+
     return filtered
 
 
@@ -830,14 +830,14 @@ async def query_with_access_control(
 ):
     """
     Execute RAG query with automatic access control filtering
-    
+
     This is the main function for executing queries with access control.
     It performs the following steps:
     1. Get list of files user can access
     2. Execute RAG query to get context
     3. Filter results (chunks, entities, relationships) by access
     4. Return filtered results
-    
+
     Args:
         rag: LightRAG instance
         query: User's query string
@@ -846,10 +846,10 @@ async def query_with_access_control(
         param: QueryParam object for query configuration
         include_shared: Include documents shared with user
         include_public: Include public documents
-        
+
     Returns:
         Filtered query results dictionary
-        
+
     Example:
         result = await query_with_access_control(
             rag=rag,
@@ -862,10 +862,10 @@ async def query_with_access_control(
         )
     """
     from lightrag.base import QueryParam
-    
+
     if param is None:
         param = QueryParam()
-    
+
     # Step 1: Get user's accessible files
     accessible_files = await get_user_accessible_files(
         rag.doc_status,
@@ -874,7 +874,7 @@ async def query_with_access_control(
         include_shared,
         include_public
     )
-    
+
     # No accessible documents
     if not accessible_files:
         return {
@@ -889,12 +889,12 @@ async def query_with_access_control(
                 "user_id": current_user.user_id if current_user.is_authenticated else None,
             }
         }
-    
+
     # Step 2: Execute query with context retrieval
     original_only_context = param.only_need_context
     param.only_need_context = True
     raw_result = await rag.aquery(query, param)
-    
+
     # Step 3: Filter results by accessible files
     if isinstance(raw_result, dict):
         filtered_chunks = await filter_chunks_by_access(
@@ -909,13 +909,13 @@ async def query_with_access_control(
             raw_result.get("relationships", []),
             accessible_files
         )
-        
+
         # If user wants full response (not just context), generate it with filtered context
         if not original_only_context:
             # TODO: Re-generate LLM response with filtered context
             # For now, return filtered context
             pass
-        
+
         return {
             "entities": filtered_entities,
             "relationships": filtered_relationships,
@@ -931,7 +931,7 @@ async def query_with_access_control(
                 "project_id": project_id,
             }
         }
-    
+
     return raw_result
 ```
 
@@ -1251,25 +1251,25 @@ curl -X POST "http://localhost:8020/query" \
     "user_id": str,                    # Owner user ID (from JWT token)
     "uploaded_by": str,                # Username who uploaded
     "upload_timestamp": str,           # ISO 8601 timestamp
-    
+
     # Access Control
     "access_control": {
         "owner": str,                  # Owner user ID
         "viewers": [str],              # List of user IDs with view access
         "editors": [str],              # List of user IDs with edit access
     },
-    
+
     # Project and Organization
     "project_id": str,                 # Project identifier
     "tags": [str],                     # List of tags
     "department": str,                 # Optional department
-    
+
     # Public Access
     "is_public": bool,                 # True if publicly accessible
-    
+
     # Role-Based Access (optional)
     "allowed_roles": [str],            # List of roles that can access
-    
+
     # Custom Fields (optional)
     "custom_field_1": Any,
     "custom_field_2": Any,
@@ -1338,16 +1338,16 @@ curl -X POST "http://localhost:8020/query" \
 
 This implementation provides:
 
-✅ **JWT-based authentication** using existing infrastructure  
-✅ **Optional authentication** - works with or without login  
-✅ **User access control** - ownership, sharing, viewers, editors  
-✅ **Project-based scoping** - organize documents into projects  
-✅ **Public documents** - allow unauthenticated access  
-✅ **Role-based access** - support for role-based permissions  
-✅ **Multimodal support** - all content types respect access control  
-✅ **Backward compatible** - existing documents continue to work  
-✅ **No schema changes** - uses existing metadata field  
-✅ **Minimal code changes** - leverages existing JWT infrastructure  
+✅ **JWT-based authentication** using existing infrastructure
+✅ **Optional authentication** - works with or without login
+✅ **User access control** - ownership, sharing, viewers, editors
+✅ **Project-based scoping** - organize documents into projects
+✅ **Public documents** - allow unauthenticated access
+✅ **Role-based access** - support for role-based permissions
+✅ **Multimodal support** - all content types respect access control
+✅ **Backward compatible** - existing documents continue to work
+✅ **No schema changes** - uses existing metadata field
+✅ **Minimal code changes** - leverages existing JWT infrastructure
 
 The implementation is **production-ready** and follows best practices for security and scalability.
 
@@ -1363,4 +1363,3 @@ The implementation is **production-ready** and follows best practices for securi
 6. **Document** any customizations or extensions you make
 
 For questions or issues, refer to the LightRAG documentation or create an issue in the repository.
-

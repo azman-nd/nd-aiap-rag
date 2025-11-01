@@ -1563,17 +1563,21 @@ class ProcessorMixin:
 
             # Initialize doc status and retrieve metadata
             current_doc_status = await self.lightrag.doc_status.get_by_id(doc_pre_id)
-            
+
             # Retrieve metadata from doc_pre_id if not provided
             if metadata is None and current_doc_status:
                 metadata = current_doc_status.get("metadata", {})
-                self.logger.info(f"Retrieved metadata from doc-pre-* status: {metadata}")
+                self.logger.info(
+                    f"Retrieved metadata from doc-pre-* status: {metadata}"
+                )
             elif metadata is None:
                 metadata = {}
-                self.logger.info("No metadata provided and doc-pre-* not found, using empty metadata")
+                self.logger.info(
+                    "No metadata provided and doc-pre-* not found, using empty metadata"
+                )
             else:
                 self.logger.info(f"Using provided metadata: {metadata}")
-            
+
             if not current_doc_status:
                 await self.lightrag.doc_status.upsert(
                     {
