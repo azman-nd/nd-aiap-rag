@@ -212,11 +212,11 @@ class QdrantVectorDBStorage(BaseVectorStorage):
         return results
 
     async def query(
-        self, 
-        query: str, 
-        top_k: int, 
+        self,
+        query: str,
+        top_k: int,
         query_embedding: list[float] = None,
-        filter_doc_ids: list[str] | None = None
+        filter_doc_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         if query_embedding is not None:
             embedding = query_embedding
@@ -228,14 +228,13 @@ class QdrantVectorDBStorage(BaseVectorStorage):
 
         # Build filter if doc IDs provided
         from qdrant_client import models
-        
+
         query_filter = None
         if filter_doc_ids:
             query_filter = models.Filter(
                 must=[
                     models.FieldCondition(
-                        key="full_doc_id",
-                        match=models.MatchAny(any=filter_doc_ids)
+                        key="full_doc_id", match=models.MatchAny(any=filter_doc_ids)
                     )
                 ]
             )

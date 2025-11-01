@@ -68,7 +68,7 @@ def get_env_value(
             else:
                 # We can't use logger here yet, so just return default
                 return default
-        except (json.JSONDecodeError, ValueError) as e:
+        except (json.JSONDecodeError, ValueError):
             # We can't use logger here yet, so just return default
             return default
 
@@ -80,17 +80,19 @@ def get_env_value(
 
 def get_log_format(include_location: bool = None) -> str:
     """Get the appropriate log format based on configuration.
-    
+
     Args:
         include_location: Whether to include filename and function name in logs.
                          If None, reads from environment variable LOG_INCLUDE_LOCATION.
-    
+
     Returns:
         str: The log format string to use.
     """
     if include_location is None:
-        include_location = get_env_value("LOG_INCLUDE_LOCATION", DEFAULT_LOG_INCLUDE_LOCATION, bool)
-    
+        include_location = get_env_value(
+            "LOG_INCLUDE_LOCATION", DEFAULT_LOG_INCLUDE_LOCATION, bool
+        )
+
     if include_location:
         return "%(levelname)s - %(filename)s:%(funcName)s:%(lineno)d - %(message)s"
     else:
@@ -99,17 +101,19 @@ def get_log_format(include_location: bool = None) -> str:
 
 def get_detailed_log_format(include_location: bool = None) -> str:
     """Get the detailed log format (with timestamp) based on configuration.
-    
+
     Args:
         include_location: Whether to include filename and function name in logs.
                          If None, reads from environment variable LOG_INCLUDE_LOCATION.
-    
+
     Returns:
         str: The detailed log format string to use.
     """
     if include_location is None:
-        include_location = get_env_value("LOG_INCLUDE_LOCATION", DEFAULT_LOG_INCLUDE_LOCATION, bool)
-    
+        include_location = get_env_value(
+            "LOG_INCLUDE_LOCATION", DEFAULT_LOG_INCLUDE_LOCATION, bool
+        )
+
     if include_location:
         return "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(funcName)s:%(lineno)d - %(message)s"
     else:

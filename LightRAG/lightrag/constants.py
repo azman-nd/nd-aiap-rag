@@ -53,8 +53,7 @@ DEFAULT_KG_CHUNK_PICK_METHOD = "VECTOR"
 DEFAULT_HISTORY_TURNS = 0
 
 # Rerank configuration defaults
-# DEFAULT_MIN_RERANK_SCORE = 0.0
-DEFAULT_MIN_RERANK_SCORE = 0.1
+DEFAULT_MIN_RERANK_SCORE = 0.0
 DEFAULT_RERANK_BINDING = "null"
 
 # File path configuration for vector and graph database(Should not be changed, used in Milvus Schema)
@@ -82,7 +81,9 @@ DEFAULT_EMBEDDING_TIMEOUT = 30
 DEFAULT_LOG_MAX_BYTES = 10485760  # Default 10MB
 DEFAULT_LOG_BACKUP_COUNT = 5  # Default 5 backups
 DEFAULT_LOG_FILENAME = "lightrag.log"  # Default log filename
-DEFAULT_LOG_INCLUDE_LOCATION = True  # Default to include filename and function name in logs
+DEFAULT_LOG_INCLUDE_LOCATION = (
+    True  # Default to include filename and function name in logs
+)
 
 # Ollama server configuration defaults
 DEFAULT_OLLAMA_MODEL_NAME = "lightrag"

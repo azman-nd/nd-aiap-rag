@@ -127,7 +127,9 @@ def create_graph_routes(rag, api_key: Optional[str] = None):
             )
 
             # DEBUG: Log accessible documents count
-            logger.info(f"DEBUG get_knowledge_graph: Found {len(accessible_docs)} accessible documents")
+            logger.info(
+                f"DEBUG get_knowledge_graph: Found {len(accessible_docs)} accessible documents"
+            )
 
             if not accessible_docs:
                 raise HTTPException(
@@ -143,7 +145,11 @@ def create_graph_routes(rag, api_key: Optional[str] = None):
             )
 
             accessible_paths = [
-                path for path in (doc_file_path(status) for status in accessible_docs.values()) if path
+                path
+                for path in (
+                    doc_file_path(status) for status in accessible_docs.values()
+                )
+                if path
             ]
 
             def node_accessible(node: Any) -> bool:
@@ -159,7 +165,9 @@ def create_graph_routes(rag, api_key: Optional[str] = None):
                     if isinstance(value, str):
                         file_values.append(value)
                     elif isinstance(value, list):
-                        file_values.extend([str(v) for v in value if isinstance(v, str)])
+                        file_values.extend(
+                            [str(v) for v in value if isinstance(v, str)]
+                        )
 
                 if not file_values:
                     return True
@@ -180,7 +188,11 @@ def create_graph_routes(rag, api_key: Optional[str] = None):
             nodes = graph_dict.get("nodes", [])
             filtered_nodes = [node for node in nodes if node_accessible(node)]
             allowed_ids = {
-                (node.get("id") if isinstance(node, dict) else getattr(node, "id", None))
+                (
+                    node.get("id")
+                    if isinstance(node, dict)
+                    else getattr(node, "id", None)
+                )
                 for node in filtered_nodes
             }
 

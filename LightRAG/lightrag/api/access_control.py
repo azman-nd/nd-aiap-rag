@@ -17,7 +17,7 @@ from typing import Any, Dict, Iterable, List, Optional
 from fastapi import HTTPException, Security, status
 from fastapi.security import OAuth2PasswordBearer
 
-from lightrag.base import DocProcessingStatus, DocStatus, QueryParam
+from lightrag.base import DocProcessingStatus, DocStatus
 from lightrag.constants import GRAPH_FIELD_SEP
 
 from .auth import auth_handler
@@ -50,7 +50,7 @@ class ShareEntry:
 
     def matches_user(self, user_id: Optional[str], user_roles: Iterable[str]) -> bool:
         """Check whether this entry targets the given user or any of their roles.
-        
+
         Supports wildcards: 'all' or '*' in user target_type matches any authenticated user.
         """
 
@@ -97,7 +97,7 @@ class AccessFilters:
 class CurrentUser:
     """
     Container for current user information extracted from JWT token
-    
+
     Attributes:
         username: Username from token
         user_id: Unique user identifier (from metadata or username)
@@ -105,7 +105,7 @@ class CurrentUser:
         metadata: Additional metadata from token
         is_authenticated: Whether user has valid authentication
     """
-    
+
     def __init__(
         self,
         username: Optional[str] = None,
@@ -139,7 +139,7 @@ class CurrentUser:
 
         Args:
             role: Role name to check
-            
+
         Returns:
             True if user has the role
         """
@@ -150,21 +150,21 @@ class CurrentUser:
 
 
 async def get_current_user_optional(
-    token: Optional[str] = Security(oauth2_scheme_optional)
+    token: Optional[str] = Security(oauth2_scheme_optional),
 ) -> CurrentUser:
     """
     Extract user information from JWT token (OPTIONAL - doesn't fail if no token)
-    
+
     This function is used as a FastAPI dependency to extract user information
     from the JWT token in the Authorization header. If no token is provided
     or the token is invalid, returns an unauthenticated guest user.
-    
+
     Args:
         token: JWT token from Authorization header (automatically extracted)
-        
+
     Returns:
         CurrentUser object (may be unauthenticated)
-        
+
     Example:
         @router.post("/endpoint")
         async def endpoint(current_user: CurrentUser = Depends(get_current_user_optional)):
@@ -176,45 +176,46 @@ async def get_current_user_optional(
     # No token provided - unauthenticated user
     if not token:
         return CurrentUser(is_authenticated=False, role="guest")
-    
+
     try:
         # Use existing auth_handler to validate token
         token_info = auth_handler.validate_token(token)
-        
+
         # Extract user information from token
         # token_info = {"username": str, "role": str, "metadata": dict, "exp": datetime}
         return CurrentUser(
             username=token_info.get("username"),
-            user_id=token_info.get("metadata", {}).get("user_id") or token_info.get("username"),
+            user_id=token_info.get("metadata", {}).get("user_id")
+            or token_info.get("username"),
             role=token_info.get("role", "user"),
             metadata=token_info.get("metadata", {}),
             is_authenticated=True,
             roles=token_info.get("metadata", {}).get("roles"),
         )
-        
+
     except Exception:
         # Invalid token - treat as unauthenticated (don't raise error for optional auth)
         return CurrentUser(is_authenticated=False, role="guest")
 
 
 async def get_current_user_required(
-    token: Optional[str] = Security(oauth2_scheme_optional)
+    token: Optional[str] = Security(oauth2_scheme_optional),
 ) -> CurrentUser:
     """
     Extract user information from JWT token (REQUIRED - fails if no valid token)
-    
+
     This function is used as a FastAPI dependency for endpoints that require
     authentication. Raises 401 Unauthorized if no token or invalid token.
-    
+
     Args:
         token: JWT token from Authorization header (automatically extracted)
-        
+
     Returns:
         CurrentUser object (always authenticated)
-        
+
     Raises:
         HTTPException: 401 if no token or invalid token
-        
+
     Example:
         @router.post("/protected-endpoint")
         async def endpoint(current_user: CurrentUser = Depends(get_current_user_required)):
@@ -226,14 +227,15 @@ async def get_current_user_required(
             detail="Authentication required",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     # Validate token (will raise HTTPException if invalid)
     token_info = auth_handler.validate_token(token)
-    
+
     # Extract user information
     return CurrentUser(
         username=token_info.get("username"),
-        user_id=token_info.get("metadata", {}).get("user_id") or token_info.get("username"),
+        user_id=token_info.get("metadata", {}).get("user_id")
+        or token_info.get("username"),
         role=token_info.get("role", "user"),
         metadata=token_info.get("metadata", {}),
         is_authenticated=True,
@@ -244,6 +246,7 @@ async def get_current_user_required(
 # ---------------------------------------------------------------------------
 # Metadata normalization helpers
 # ---------------------------------------------------------------------------
+
 
 def normalize_tag_items(raw_tags: Any) -> List[Dict[str, str]]:
     """Normalize user-supplied tag payload into a list of name/value dicts.
@@ -327,7 +330,9 @@ def parse_share_entry(entry: str) -> ShareEntry:
     permission = Permission.from_value(permission_raw)
     if not identifier:
         raise ValueError("Share entry identifier cannot be empty")
-    return ShareEntry(target_type=target_type, permission=permission, identifier=identifier)
+    return ShareEntry(
+        target_type=target_type, permission=permission, identifier=identifier
+    )
 
 
 def normalize_share_items(raw_share: Any) -> List[ShareEntry]:
@@ -366,7 +371,9 @@ def normalize_share_items(raw_share: Any) -> List[ShareEntry]:
             try:
                 entry = ShareEntry(
                     target_type=str(item.get("target_type", "")).strip().lower(),
-                    permission=Permission.from_value(str(item.get("permission", "view"))),
+                    permission=Permission.from_value(
+                        str(item.get("permission", "view"))
+                    ),
                     identifier=str(item.get("identifier", "")).strip(),
                 )
             except ValueError:
@@ -421,15 +428,27 @@ def metadata_share_entries(metadata: Dict[str, Any]) -> List[ShareEntry]:
         owner = access_control.get("owner")
         if owner:
             entries.append(
-                ShareEntry(target_type="user", permission=Permission.EDIT, identifier=str(owner))
+                ShareEntry(
+                    target_type="user",
+                    permission=Permission.EDIT,
+                    identifier=str(owner),
+                )
             )
         for viewer in access_control.get("viewers", []) or []:
             entries.append(
-                ShareEntry(target_type="user", permission=Permission.VIEW, identifier=str(viewer))
+                ShareEntry(
+                    target_type="user",
+                    permission=Permission.VIEW,
+                    identifier=str(viewer),
+                )
             )
         for editor in access_control.get("editors", []) or []:
             entries.append(
-                ShareEntry(target_type="user", permission=Permission.EDIT, identifier=str(editor))
+                ShareEntry(
+                    target_type="user",
+                    permission=Permission.EDIT,
+                    identifier=str(editor),
+                )
             )
 
     # Deduplicate
@@ -468,6 +487,7 @@ def metadata_matches_filters(metadata: Dict[str, Any], filters: AccessFilters) -
 # Access evaluation helpers
 # ---------------------------------------------------------------------------
 
+
 async def get_user_accessible_files(
     doc_status_storage,
     current_user: CurrentUser,
@@ -486,7 +506,7 @@ async def get_user_accessible_files(
     - Role-based access (user has required role)
     - Public access (document is marked as public)
     - Project scoping (optional filter by project)
-    
+
     Args:
         doc_status_storage: Document status storage instance
         current_user: Current user from JWT token (may be unauthenticated)
@@ -495,10 +515,10 @@ async def get_user_accessible_files(
         include_public: Include public documents (default: True)
         required_permission: Permission required for the operation (view/edit)
         filters: Additional metadata filters supplied by caller
-        
+
     Returns:
         Dict mapping doc_id -> DocProcessingStatus
-        
+
     Example:
         accessible_files = await get_user_accessible_files(
             rag.doc_status,
@@ -513,10 +533,13 @@ async def get_user_accessible_files(
     # Get all processed documents
     all_docs = await doc_status_storage.get_docs_by_status(DocStatus.PROCESSED)
     accessible_docs: dict[str, DocProcessingStatus] = {}
-    
+
     # DEBUG: Log total documents found
     from lightrag.utils import logger
-    logger.info(f"DEBUG get_user_accessible_files: Found {len(all_docs)} PROCESSED documents")
+
+    logger.info(
+        f"DEBUG get_user_accessible_files: Found {len(all_docs)} PROCESSED documents"
+    )
     logger.info(
         f"DEBUG get_user_accessible_files: Filters - project_id={repr(filters.project_id)}, "
         f"owner={repr(filters.owner)}, tags={filters.tags}, "
@@ -556,7 +579,9 @@ async def get_user_accessible_files(
         if not current_user.is_authenticated:
             if is_public and include_public:
                 accessible_docs[doc_id] = doc_status
-                logger.info(f"DEBUG get_user_accessible_files: Doc {doc_id} ACCESSIBLE (public, unauthenticated user)")
+                logger.info(
+                    f"DEBUG get_user_accessible_files: Doc {doc_id} ACCESSIBLE (public, unauthenticated user)"
+                )
             else:
                 logger.info(
                     f"DEBUG get_user_accessible_files: Doc {doc_id} NOT ACCESSIBLE "
@@ -571,7 +596,7 @@ async def get_user_accessible_files(
         # Ownership grants full access (check both owner and uploaded_by)
         owner_id = metadata_owner(metadata)
         is_owner = owner_id == user_id if owner_id and user_id else False
-        
+
         # Also check if user uploaded the document
         uploaded_by = metadata.get("uploaded_by")
         is_uploader = uploaded_by == user_id if uploaded_by and user_id else False
@@ -589,20 +614,31 @@ async def get_user_accessible_files(
         # Check 1: User is the owner or uploader
         if is_owner or is_uploader:
             has_access = True
-        
+
         # Check 2: Document is shared with user (if not already granted access)
         if not has_access and include_shared and share_entries:
             for entry in share_entries:
-                if entry.matches_user(user_id, user_roles) and entry.allows(required_permission):
+                if entry.matches_user(user_id, user_roles) and entry.allows(
+                    required_permission
+                ):
                     has_access = True
                     break
-        
+
         # Check 3: User has role-based access (if not already granted access)
-        if not has_access and has_role_access and required_permission == Permission.VIEW:
+        if (
+            not has_access
+            and has_role_access
+            and required_permission == Permission.VIEW
+        ):
             has_access = True
-        
+
         # Check 4: Document is public (if not already granted access)
-        if not has_access and is_public and include_public and required_permission == Permission.VIEW:
+        if (
+            not has_access
+            and is_public
+            and include_public
+            and required_permission == Permission.VIEW
+        ):
             has_access = True
 
         if has_access:
@@ -620,50 +656,55 @@ async def get_user_accessible_files(
                 f"share_entries={len(share_entries)}, has_role_access={has_role_access}, is_public={is_public})"
             )
 
-    logger.info(f"DEBUG get_user_accessible_files: Returning {len(accessible_docs)} accessible documents")
+    logger.info(
+        f"DEBUG get_user_accessible_files: Returning {len(accessible_docs)} accessible documents"
+    )
     return accessible_docs
 
 
 async def filter_chunks_by_access(
-    chunks: list[dict],
-    accessible_files: dict[str, DocProcessingStatus]
+    chunks: list[dict], accessible_files: dict[str, DocProcessingStatus]
 ) -> list[dict]:
     """
     Filter chunks to only those from accessible files
-    
+
     Args:
         chunks: List of chunk dictionaries with file_path field
         accessible_files: Mapping of accessible doc IDs to status objects
-        
+
     Returns:
         Filtered list of chunks
     """
     accessible_paths = {
-        path for path in (doc_file_path(status) for status in accessible_files.values()) if path
+        path
+        for path in (doc_file_path(status) for status in accessible_files.values())
+        if path
     }
 
     return [
         chunk
         for chunk in chunks
-        if any(access_path in (chunk.get("file_path") or "") for access_path in accessible_paths)
+        if any(
+            access_path in (chunk.get("file_path") or "")
+            for access_path in accessible_paths
+        )
     ]
 
 
 async def filter_entities_by_access(
-    entities: list[dict],
-    accessible_files: dict[str, DocProcessingStatus]
+    entities: list[dict], accessible_files: dict[str, DocProcessingStatus]
 ) -> list[dict]:
     """
     Filter entities to only those from accessible files
-    
+
     Entities can have multiple file_paths (when entity appears in multiple documents)
     separated by GRAPH_FIELD_SEP ("<SEP>"). An entity is accessible if ANY of its
     file_paths are accessible.
-    
+
     Args:
         entities: List of entity dictionaries with file_path field
         accessible_files: List of file_path strings user can access
-        
+
     Returns:
         Filtered list of entities
     """
@@ -671,7 +712,7 @@ async def filter_entities_by_access(
     for entity in entities:
         # Entities can have multiple file_paths separated by <SEP>
         entity_file_paths = entity.get("file_path", "").split(GRAPH_FIELD_SEP)
-        
+
         # Check if ANY of the entity's file_paths are accessible
         for accessible_status in accessible_files.values():
             file_path = doc_file_path(accessible_status)
@@ -691,4 +732,3 @@ def doc_file_path(doc_status: Any) -> Optional[str]:
     if value is None and isinstance(doc_status, dict):
         value = doc_status.get("file_path")
     return value
-

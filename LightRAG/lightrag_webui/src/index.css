@@ -139,7 +139,7 @@
   * {
     @apply border-border outline-ring/50;
   }
-  
+
   html, body {
     @apply bg-background text-foreground;
     margin: 0;
@@ -148,7 +148,7 @@
     height: 100%;
     width: 100%;
   }
-  
+
   #root {
     height: 100%;
     width: 100%;

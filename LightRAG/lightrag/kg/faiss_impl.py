@@ -180,11 +180,11 @@ class FaissVectorDBStorage(BaseVectorStorage):
         return [m["__id__"] for m in list_data]
 
     async def query(
-        self, 
-        query: str, 
-        top_k: int, 
+        self,
+        query: str,
+        top_k: int,
         query_embedding: list[float] = None,
-        filter_doc_ids: list[str] | None = None
+        filter_doc_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """
         Search by a textual query; returns top_k results with their metadata + similarity distance.
@@ -221,13 +221,13 @@ class FaissVectorDBStorage(BaseVectorStorage):
                 continue
 
             meta = self._id_to_meta.get(idx, {})
-            
+
             # Filter by doc IDs if provided (post-retrieval for in-memory storage)
             if filter_set is not None:
                 full_doc_id = meta.get("full_doc_id")
                 if full_doc_id not in filter_set:
                     continue
-            
+
             # Filter out __vector__ from query results to avoid returning large vector data
             filtered_meta = {k: v for k, v in meta.items() if k != "__vector__"}
             results.append(

@@ -61,52 +61,51 @@ load_dotenv(dotenv_path=".env", override=False)
 
 
 async def _get_chunk_ids_for_doc_ids(
-    text_chunks_db: BaseKVStorage,
-    doc_ids: list[str]
+    text_chunks_db: BaseKVStorage, doc_ids: list[str]
 ) -> set[str]:
     """
     Get all chunk IDs that belong to the specified document IDs.
-    
+
     This function scans the text chunks storage and collects chunk IDs
     where full_doc_id matches any of the provided doc_ids. This mapping
     is used to filter entities and relationships during query execution,
     since they store chunk IDs (not doc IDs) in their source_id fields.
-    
+
     Args:
         text_chunks_db: Text chunks storage (BaseKVStorage)
         doc_ids: List of document IDs to filter by (e.g., ["doc-abc123", "doc-xyz789"])
-        
+
     Returns:
         Set of chunk IDs belonging to the documents (e.g., {"chunk-123", "chunk-456"})
-        
+
     Note:
         This performs an O(n) scan of all chunks. For large datasets, consider
         caching the doc_id → chunk_ids mapping if performance becomes an issue.
     """
     if not doc_ids:
         return set()
-    
+
     doc_ids_set = set(doc_ids)
     allowed_chunk_ids = set()
-    
+
     try:
         # Get all data from text_chunks_db
         # Different storage types may have different methods to iterate
         # For now, we'll use a generic approach that works with most KV stores
-        
+
         # Most KV storage implementations store data in memory and can be accessed
         # We need to iterate through all chunks and check their full_doc_id
-        storage_data = getattr(text_chunks_db, '_data', None)
-        
+        storage_data = getattr(text_chunks_db, "_data", None)
+
         if storage_data is not None:
             # In-memory storage (JSON-based)
             for chunk_id, chunk_data in storage_data.items():
                 if isinstance(chunk_data, dict):
-                    full_doc_id = chunk_data.get('full_doc_id')
+                    full_doc_id = chunk_data.get("full_doc_id")
                     if full_doc_id in doc_ids_set:
                         # Extract the actual chunk ID
                         # The key might be the chunk ID or we need to get it from _id field
-                        actual_chunk_id = chunk_data.get('_id', chunk_id)
+                        actual_chunk_id = chunk_data.get("_id", chunk_id)
                         allowed_chunk_ids.add(actual_chunk_id)
         else:
             # For database-backed storage, we may need a different approach
@@ -115,13 +114,13 @@ async def _get_chunk_ids_for_doc_ids(
                 "Could not access text_chunks_db data directly. "
                 "Doc ID filtering may not work correctly for this storage type."
             )
-    
+
     except Exception as e:
         logger.error(f"Error getting chunk IDs for doc IDs: {e}")
         # Return empty set on error - this will effectively filter out everything
         # which is safer than allowing all
         return set()
-    
+
     logger.debug(f"Mapped {len(doc_ids)} doc IDs to {len(allowed_chunk_ids)} chunk IDs")
     return allowed_chunk_ids
 
@@ -2713,12 +2712,13 @@ async def _get_vector_context(
         search_top_k = query_param.chunk_top_k or query_param.top_k
         cosine_threshold = chunks_vdb.cosine_better_than_threshold
 
-        # Pass filter_doc_ids to enable document-level filtering
+        # Pass filterby_ids to enable document-level filtering
         results = await chunks_vdb.query(
-            query, 
-            top_k=search_top_k, 
+            query,
+            top_k=search_top_k,
             query_embedding=query_embedding,
-            filter_doc_ids=query_param.ids  # Pass doc IDs for filtering
+            filterby_ids=query_param.ids,  # Pass doc IDs for filtering
+            filter_type="document",
         )
         if not results:
             logger.info(
@@ -2798,14 +2798,14 @@ async def _perform_kg_search(
     # Handle local and global modes
     filter_chunk_ids = None
     filter_chunk_ids = await _get_chunk_ids_for_doc_ids(text_chunks_db, query_param.ids)
-    
+
     if query_param.mode == "local" and len(ll_keywords) > 0:
         local_entities, local_relations = await _get_node_data(
             ll_keywords,
             knowledge_graph_inst,
             entities_vdb,
             query_param,
-            filter_chunk_ids
+            filter_chunk_ids,
         )
 
     elif query_param.mode == "global" and len(hl_keywords) > 0:
@@ -2814,7 +2814,7 @@ async def _perform_kg_search(
             knowledge_graph_inst,
             relationships_vdb,
             query_param,
-            filter_chunk_ids
+            filter_chunk_ids,
         )
 
     else:  # hybrid or mix mode
@@ -2824,7 +2824,7 @@ async def _perform_kg_search(
                 knowledge_graph_inst,
                 entities_vdb,
                 query_param,
-                filter_chunk_ids
+                filter_chunk_ids,
             )
         if len(hl_keywords) > 0:
             global_relations, global_entities = await _get_edge_data(
@@ -2832,7 +2832,7 @@ async def _perform_kg_search(
                 knowledge_graph_inst,
                 relationships_vdb,
                 query_param,
-                filter_chunk_ids
+                filter_chunk_ids,
             )
 
         # Get vector chunks for mix mode
@@ -3592,14 +3592,19 @@ async def _get_node_data(
     knowledge_graph_inst: BaseGraphStorage,
     entities_vdb: BaseVectorStorage,
     query_param: QueryParam,
-    filter_chunk_ids: list[str]|None = None
+    filter_chunk_ids: list[str] | None = None,
 ):
     # get similar entities
     logger.info(
         f"Query nodes: {query} (top_k:{query_param.top_k}, cosine:{entities_vdb.cosine_better_than_threshold})"
     )
 
-    results = await entities_vdb.query(query, top_k=query_param.top_k, filter_chunk_ids=filter_chunk_ids)
+    results = await entities_vdb.query(
+        query,
+        top_k=query_param.top_k,
+        filterby_ids=filter_chunk_ids,
+        filter_type="chunk",
+    )
 
     if not len(results):
         return [], []
@@ -3870,13 +3875,18 @@ async def _get_edge_data(
     knowledge_graph_inst: BaseGraphStorage,
     relationships_vdb: BaseVectorStorage,
     query_param: QueryParam,
-    filter_chunk_ids: list[str]|None = None
+    filter_chunk_ids: list[str] | None = None,
 ):
     logger.info(
         f"Query edges: {keywords} (top_k:{query_param.top_k}, cosine:{relationships_vdb.cosine_better_than_threshold})"
     )
 
-    results = await relationships_vdb.query(keywords, top_k=query_param.top_k, filter_chunk_ids=filter_chunk_ids)
+    results = await relationships_vdb.query(
+        keywords,
+        top_k=query_param.top_k,
+        filterby_ids=filter_chunk_ids,
+        filter_type="chunk",
+    )
 
     if not len(results):
         return [], []

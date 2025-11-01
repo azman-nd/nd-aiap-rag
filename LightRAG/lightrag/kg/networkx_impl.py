@@ -416,9 +416,7 @@ class NetworkXStorage(BaseGraphStorage):
         return matching_edges
 
     async def get_nodes_by_chunk_ids_filtered(
-        self,
-        chunk_ids: list[str],
-        allowed_chunk_ids: set[str]
+        self, chunk_ids: list[str], allowed_chunk_ids: set[str]
     ) -> list[dict]:
         """Optimized filtered node retrieval for NetworkX."""
         chunk_ids_set = set(chunk_ids)
@@ -429,16 +427,16 @@ class NetworkXStorage(BaseGraphStorage):
             if "source_id" in node_data:
                 node_source_ids = set(node_data["source_id"].split(GRAPH_FIELD_SEP))
                 # Include if ANY matches query AND ANY is allowed
-                if not node_source_ids.isdisjoint(chunk_ids_set) and not node_source_ids.isdisjoint(allowed_chunk_ids_set):
+                if not node_source_ids.isdisjoint(
+                    chunk_ids_set
+                ) and not node_source_ids.isdisjoint(allowed_chunk_ids_set):
                     node_data_with_id = node_data.copy()
                     node_data_with_id["id"] = node_id
                     matching_nodes.append(node_data_with_id)
         return matching_nodes
 
     async def get_edges_by_chunk_ids_filtered(
-        self,
-        chunk_ids: list[str],
-        allowed_chunk_ids: set[str]
+        self, chunk_ids: list[str], allowed_chunk_ids: set[str]
     ) -> list[dict]:
         """Optimized filtered edge retrieval for NetworkX."""
         chunk_ids_set = set(chunk_ids)
@@ -449,7 +447,9 @@ class NetworkXStorage(BaseGraphStorage):
             if "source_id" in edge_data:
                 edge_source_ids = set(edge_data["source_id"].split(GRAPH_FIELD_SEP))
                 # Include if ANY matches query AND ANY is allowed
-                if not edge_source_ids.isdisjoint(chunk_ids_set) and not edge_source_ids.isdisjoint(allowed_chunk_ids_set):
+                if not edge_source_ids.isdisjoint(
+                    chunk_ids_set
+                ) and not edge_source_ids.isdisjoint(allowed_chunk_ids_set):
                     edge_data_with_nodes = edge_data.copy()
                     edge_data_with_nodes["source"] = u
                     edge_data_with_nodes["target"] = v

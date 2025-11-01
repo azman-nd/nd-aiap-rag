@@ -51,16 +51,19 @@ class AccessFilterPayload(BaseModel):
     """Metadata filters provided by the client to scope query results."""
 
     project_id: Optional[str] = Field(
-        default=None, description="Project identifier used to scope accessible documents"
+        default=None,
+        description="Project identifier used to scope accessible documents",
     )
     owner: Optional[str] = Field(
         default=None, description="Owner user id used to scope accessible documents"
     )
     tags: Optional[List[TagFilter]] = Field(
-        default=None, description="List of tags (name/value pairs) that documents must contain"
+        default=None,
+        description="List of tags (name/value pairs) that documents must contain",
     )
     filename: Optional[str] = Field(
-        default=None, description="Filter by document filename (supports partial matching)"
+        default=None,
+        description="Filter by document filename (supports partial matching)",
     )
 
     @field_validator("project_id", "owner", "filename", mode="after")
@@ -195,11 +198,7 @@ def build_access_filters(payload: AccessFilterPayload | None) -> AccessFilters:
     if payload is None:
         return AccessFilters()
 
-    tags_payload = (
-        [tag.model_dump() for tag in payload.tags]
-        if payload.tags
-        else None
-    )
+    tags_payload = [tag.model_dump() for tag in payload.tags] if payload.tags else None
     tags = normalize_tag_items(tags_payload)
     return AccessFilters(
         project_id=payload.project_id,
@@ -253,10 +252,10 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
     ):
         """
         Handle a POST request at the /query endpoint to process user queries using RAG capabilities.
-        
+
         Document ID filtering: The system now filters results by document IDs during retrieval.
         - Vector databases filter chunks by full_doc_id field (supported in Milvus, MongoDB, PostgreSQL, Qdrant, Faiss, NanoVectorDB)
-        - Graph databases filter entities/relationships by their source_id (chunk IDs) 
+        - Graph databases filter entities/relationships by their source_id (chunk IDs)
         - See _get_chunk_ids_for_doc_ids() in operate.py for the doc_id → chunk_id mapping logic
 
         Parameters:
@@ -283,7 +282,7 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                 filters=filters,
                 required_permission=Permission.VIEW,
             )
-            
+
             if not accessible_docs:
                 detail = (
                     "No accessible documents found for the provided metadata filters."
@@ -294,7 +293,9 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
 
             apply_doc_id_filter(param, accessible_docs)
 
-            logger.info(f"[query_text] Invoking rag.aquery() with param.ids={param.ids}")
+            logger.info(
+                f"[query_text] Invoking rag.aquery() with param.ids={param.ids}"
+            )
             response = await rag.aquery(request.query, param=param)
 
             if isinstance(response, str):
@@ -336,7 +337,7 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                 filters=filters,
                 required_permission=Permission.VIEW,
             )
-            
+
             if not accessible_docs:
                 raise HTTPException(
                     status_code=403,
@@ -345,7 +346,9 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
 
             apply_doc_id_filter(param, accessible_docs)
 
-            logger.info(f"[query_text_stream] Invoking rag.aquery() with param.ids={param.ids}")
+            logger.info(
+                f"[query_text_stream] Invoking rag.aquery() with param.ids={param.ids}"
+            )
             response = await rag.aquery(request.query, param=param)
 
             async def stream_generator():
@@ -418,7 +421,7 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                 filters=filters,
                 required_permission=Permission.VIEW,
             )
-            
+
             if not accessible_docs:
                 raise HTTPException(
                     status_code=403,
@@ -427,7 +430,9 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
 
             apply_doc_id_filter(param, accessible_docs)
 
-            logger.info(f"[query_data] Invoking rag.aquery_data() with param.ids={param.ids}")
+            logger.info(
+                f"[query_data] Invoking rag.aquery_data() with param.ids={param.ids}"
+            )
             response = await rag.aquery_data(request.query, param=param)
 
             # The aquery_data method returns a dict with entities, relationships, chunks, and metadata
@@ -449,7 +454,11 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                     metadata = {}
 
                 accessible_paths = [
-                    path for path in (doc_file_path(status) for status in accessible_docs.values()) if path
+                    path
+                    for path in (
+                        doc_file_path(status) for status in accessible_docs.values()
+                    )
+                    if path
                 ]
                 metadata.update(
                     {

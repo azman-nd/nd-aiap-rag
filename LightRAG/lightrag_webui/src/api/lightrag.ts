@@ -416,10 +416,10 @@ export const queryGraphs = async (
 
 /**
  * Get list of accessible document filenames
- * 
+ *
  * Returns a list of filenames that the current user has access to view,
  * based on their authentication status and access control rules.
- * 
+ *
  * @param filters Optional metadata filters to narrow down the list
  * @returns Array of accessible filenames
  */
@@ -444,10 +444,10 @@ export const getDocumentsList = async (filters?: AccessFilterPayload): Promise<s
 
 /**
  * Get list of unique project IDs from accessible documents
- * 
+ *
  * Returns a list of unique project_id values from documents that the
  * current user has access to view. Useful for populating project filter dropdowns.
- * 
+ *
  * @param filters Optional metadata filters (owner, tags) to narrow down the list
  * @returns Array of unique project IDs
  */

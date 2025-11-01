@@ -38,7 +38,6 @@ from ..access_control import (
     ShareEntry,
     doc_file_path,
     get_current_user_optional,
-    get_current_user_required,
     get_user_accessible_files,
     normalize_share_items,
     normalize_tag_items,
@@ -156,7 +155,9 @@ def build_access_metadata(
         "is_public": bool(is_public),
         "project_id": (project_id or "default").strip() if project_id else "default",
         "tags": tags,
-        "uploaded_by": current_user.username if current_user.is_authenticated else "anonymous",
+        "uploaded_by": current_user.username
+        if current_user.is_authenticated
+        else "anonymous",
         "upload_timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -258,10 +259,18 @@ class ScanRequest(BaseModel):
     """Request model for document scanning operations."""
 
     schemeConfig: SchemeConfig = Field(..., description="Scanning scheme configuration")
-    project_id: Optional[str] = Field(None, description="Project identifier for grouping documents")
-    is_public: bool = Field(False, description="Whether documents are publicly accessible")
-    tags: Optional[List[Dict[str, str]]] = Field(None, description="Tags for categorizing documents")
-    share: Optional[List[ShareEntry]] = Field(None, description="Share entries for access control")
+    project_id: Optional[str] = Field(
+        None, description="Project identifier for grouping documents"
+    )
+    is_public: bool = Field(
+        False, description="Whether documents are publicly accessible"
+    )
+    tags: Optional[List[Dict[str, str]]] = Field(
+        None, description="Tags for categorizing documents"
+    )
+    share: Optional[List[ShareEntry]] = Field(
+        None, description="Share entries for access control"
+    )
     owner: Optional[str] = Field(None, description="Explicit owner user ID")
 
 
@@ -354,13 +363,19 @@ class InsertTextRequest(BaseModel):
     )
     file_source: str = Field(default=None, min_length=0, description="File Source")
     project_id: Optional[str] = Field(default=None, description="Project identifier")
-    is_public: bool = Field(default=False, description="Whether document is publicly accessible")
-    tags: Optional[list[TagSpec]] = Field(default=None, description="List of tags (name/value pairs)")
+    is_public: bool = Field(
+        default=False, description="Whether document is publicly accessible"
+    )
+    tags: Optional[list[TagSpec]] = Field(
+        default=None, description="List of tags (name/value pairs)"
+    )
     share: Optional[list[ShareSpec]] = Field(
-        default=None, description="List of share entries granting view or edit permissions"
+        default=None,
+        description="List of share entries granting view or edit permissions",
     )
     owner: Optional[str] = Field(
-        default=None, description="Explicit owner user id (defaults to authenticated user)"
+        default=None,
+        description="Explicit owner user id (defaults to authenticated user)",
     )
 
     @field_validator("text", mode="after")
@@ -387,7 +402,11 @@ class InsertTextRequest(BaseModel):
                 "is_public": False,
                 "tags": [{"name": "department", "value": "finance"}],
                 "share": [
-                    {"target_type": "user", "permission": "view", "identifier": "user-b"}
+                    {
+                        "target_type": "user",
+                        "permission": "view",
+                        "identifier": "user-b",
+                    }
                 ],
             }
         }
@@ -414,13 +433,19 @@ class InsertTextsRequest(BaseModel):
         default=None, min_length=0, description="Sources of the texts"
     )
     project_id: Optional[str] = Field(default=None, description="Project identifier")
-    is_public: bool = Field(default=False, description="Whether documents are publicly accessible")
-    tags: Optional[list[TagSpec]] = Field(default=None, description="List of tags (name/value pairs)")
+    is_public: bool = Field(
+        default=False, description="Whether documents are publicly accessible"
+    )
+    tags: Optional[list[TagSpec]] = Field(
+        default=None, description="List of tags (name/value pairs)"
+    )
     share: Optional[list[ShareSpec]] = Field(
-        default=None, description="List of share entries granting view or edit permissions"
+        default=None,
+        description="List of share entries granting view or edit permissions",
     )
     owner: Optional[str] = Field(
-        default=None, description="Explicit owner user id (defaults to authenticated user)"
+        default=None,
+        description="Explicit owner user id (defaults to authenticated user)",
     )
 
     @field_validator("texts", mode="after")
@@ -454,7 +479,11 @@ class InsertTextsRequest(BaseModel):
                     {"name": "quarter", "value": "Q1"},
                 ],
                 "share": [
-                    {"target_type": "role", "permission": "view", "identifier": "analyst"}
+                    {
+                        "target_type": "role",
+                        "permission": "view",
+                        "identifier": "analyst",
+                    }
                 ],
             }
         }
@@ -1669,7 +1698,7 @@ async def pipeline_index_texts(
                 file_sources.append("unknown_source")
                 for _ in range(len(file_sources), len(texts))
             ]
-    
+
     # Enqueue documents
     await rag.apipeline_enqueue_documents(
         input=texts,
@@ -1677,32 +1706,34 @@ async def pipeline_index_texts(
         track_id=track_id,
         metadata=metadata,
     )
-    
+
     # If metadata is provided, update the doc_status entries with metadata
     if metadata:
         # Get the doc IDs that were just enqueued
         from lightrag.utils import compute_mdhash_id, sanitize_text_for_encoding
-        
+
         for text, file_source in zip(texts, file_sources or [None] * len(texts)):
             cleaned_content = sanitize_text_for_encoding(text)
             doc_id = compute_mdhash_id(cleaned_content, prefix="doc-")
-            
+
             # Get current doc_status and update with metadata
             current_doc_status = await rag.doc_status.get_by_id(doc_id)
             if current_doc_status:
                 # Merge metadata with existing metadata
                 existing_metadata = current_doc_status.get("metadata", {})
                 merged_metadata = {**existing_metadata, **metadata}
-                
-                await rag.doc_status.upsert({
-                    doc_id: {
-                        **current_doc_status,
-                        "metadata": merged_metadata,
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
+
+                await rag.doc_status.upsert(
+                    {
+                        doc_id: {
+                            **current_doc_status,
+                            "metadata": merged_metadata,
+                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                        }
                     }
-                })
+                )
                 logger.debug(f"Updated doc_status with metadata for {doc_id}")
-    
+
     await rag.apipeline_process_enqueue_documents()
 
 
@@ -1746,15 +1777,27 @@ async def run_scanning_process(
             # This is important for retry scenarios
             if metadata is None:
                 try:
-                    failed_docs = await rag.doc_status.get_docs_by_status(DocStatus.FAILED)
+                    failed_docs = await rag.doc_status.get_docs_by_status(
+                        DocStatus.FAILED
+                    )
                     for file_path in new_files:
                         filename = file_path.name
                         for doc_id, doc_status in failed_docs.items():
-                            doc_file_path = doc_status.get("file_path") if isinstance(doc_status, dict) else getattr(doc_status, "file_path", None)
+                            doc_file_path = (
+                                doc_status.get("file_path")
+                                if isinstance(doc_status, dict)
+                                else getattr(doc_status, "file_path", None)
+                            )
                             if doc_file_path == filename:
-                                failed_metadata = doc_status.get("metadata") if isinstance(doc_status, dict) else getattr(doc_status, "metadata", {})
+                                failed_metadata = (
+                                    doc_status.get("metadata")
+                                    if isinstance(doc_status, dict)
+                                    else getattr(doc_status, "metadata", {})
+                                )
                                 if failed_metadata:
-                                    logger.info(f"Found failed document metadata for {filename}, will reuse for retry")
+                                    logger.info(
+                                        f"Found failed document metadata for {filename}, will reuse for retry"
+                                    )
                                     # Note: This reuses metadata from first found failed doc
                                     # If scanning multiple files, they all get the same metadata
                                     # This is acceptable for retry scenarios
@@ -1764,7 +1807,7 @@ async def run_scanning_process(
                             break  # Found metadata, use it for all files
                 except Exception as e:
                     logger.warning(f"Could not check for failed document metadata: {e}")
-            
+
             # Process all files at once with track_id
             if is_pipeline_busy:
                 logger.info(
@@ -2247,7 +2290,7 @@ def create_document_routes(
         "/scan", response_model=ScanResponse, dependencies=[Depends(combined_auth)]
     )
     async def scan_for_new_documents(
-        request: ScanRequest, 
+        request: ScanRequest,
         background_tasks: BackgroundTasks,
         current_user: CurrentUser = Depends(get_current_user_optional),
     ):
@@ -2271,7 +2314,13 @@ def create_document_routes(
 
         # Build access control metadata if provided
         metadata = None
-        if request.project_id or request.tags or request.share or request.owner or request.is_public:
+        if (
+            request.project_id
+            or request.tags
+            or request.share
+            or request.owner
+            or request.is_public
+        ):
             metadata = build_access_metadata(
                 current_user=current_user,
                 project_id=request.project_id,
@@ -2318,7 +2367,7 @@ def create_document_routes(
         This API endpoint accepts a file through an HTTP POST request, checks if the
         uploaded file is of a supported type, saves it in the specified input directory,
         indexes it for retrieval, and returns a success status with relevant details.
-        
+
         User identity is automatically extracted from JWT token in Authorization header.
         Access control metadata is stored with the document.
 
@@ -2365,41 +2414,16 @@ def create_document_routes(
                 shutil.copyfileobj(file.file, buffer)
 
             track_id = generate_track_id("upload")
-            
-            # Check if this file was previously processed and failed
-            # If so, retrieve and reuse the metadata for retry
-            doc_pre_id = f"doc-pre-{safe_filename}"
-            existing_failed_doc = None
-            try:
-                # Check for existing doc-pre-* first
-                existing_pre_doc = await rag.doc_status.get_by_id(doc_pre_id)
-                if existing_pre_doc and existing_pre_doc.get("metadata"):
-                    logger.info(f"Found existing doc-pre-* metadata for {safe_filename}, will merge with new metadata")
-                    # Merge: new metadata takes precedence, but preserve fields not provided
-                    existing_metadata = existing_pre_doc.get("metadata", {})
-                    for key, value in existing_metadata.items():
-                        if key not in metadata or metadata[key] in [None, "", [], {}]:
-                            metadata[key] = value
-                            logger.info(f"Preserved metadata field '{key}' from previous attempt")
-                
-                # Also check for failed documents with same filename
-                failed_docs = await rag.doc_status.get_docs_by_status(DocStatus.FAILED)
-                for doc_id, doc_status in failed_docs.items():
-                    doc_file_path = doc_status.get("file_path") if isinstance(doc_status, dict) else getattr(doc_status, "file_path", None)
-                    if doc_file_path == safe_filename:
-                        existing_failed_doc = doc_status
-                        logger.info(f"Found failed document {doc_id} for file {safe_filename}")
-                        # Merge metadata from failed document
-                        failed_metadata = doc_status.get("metadata") if isinstance(doc_status, dict) else getattr(doc_status, "metadata", {})
-                        if failed_metadata:
-                            for key, value in failed_metadata.items():
-                                if key not in metadata or metadata[key] in [None, "", [], {}]:
-                                    metadata[key] = value
-                                    logger.info(f"Preserved metadata field '{key}' from failed document")
-                        break
-            except Exception as e:
-                logger.warning(f"Could not check for existing metadata: {e}")
-                # Continue with provided metadata
+
+            # Parse JSON strings for access control - build metadata from request parameters
+            metadata = build_access_metadata(
+                current_user=current_user,
+                project_id=project_id,
+                is_public=is_public,
+                raw_tags=tags,
+                raw_share=share,
+                owner=owner,
+            )
 
             def load_config():
                 try:
@@ -2421,16 +2445,6 @@ def create_document_routes(
             current_extractor = config.get("extractor")
             current_modelSource = config.get("modelSource")
             doc_pre_id = f"doc-pre-{safe_filename}"
-
-            # Parse JSON strings for access control
-            metadata = build_access_metadata(
-                current_user=current_user,
-                project_id=project_id,
-                is_public=is_public,
-                raw_tags=tags,
-                raw_share=share,
-                owner=owner,
-            )
 
             logger.info(
                 "Document upload metadata: owner=%s, project_id=%s, is_public=%s, share=%s",
@@ -2463,8 +2477,9 @@ def create_document_routes(
                     metadata=metadata,
                 )
 
-            
-            logger.info(f"AZ>> doc_status added, contains metadata {metadata}, track_id {track_id}")
+            logger.info(
+                f"AZ>> doc_status added, contains metadata {metadata}, track_id {track_id}"
+            )
             await rag.doc_status.upsert(
                 {
                     doc_pre_id: {
@@ -2497,7 +2512,7 @@ def create_document_routes(
         "/text", response_model=InsertResponse, dependencies=[Depends(combined_auth)]
     )
     async def insert_text(
-        request: InsertTextRequest, 
+        request: InsertTextRequest,
         background_tasks: BackgroundTasks,
         current_user: CurrentUser = Depends(get_current_user_optional),
     ):
@@ -2564,7 +2579,7 @@ def create_document_routes(
         dependencies=[Depends(combined_auth)],
     )
     async def insert_texts(
-        request: InsertTextsRequest, 
+        request: InsertTextsRequest,
         background_tasks: BackgroundTasks,
         current_user: CurrentUser = Depends(get_current_user_optional),
     ):
@@ -2950,25 +2965,27 @@ def create_document_routes(
     async def get_document_filenames(
         project_id: Optional[str] = Query(None, description="Filter by project ID"),
         owner: Optional[str] = Query(None, description="Filter by owner user ID"),
-        tags: Optional[str] = Query(None, description="Filter by tags (JSON array or comma separated)"),
+        tags: Optional[str] = Query(
+            None, description="Filter by tags (JSON array or comma separated)"
+        ),
         current_user: CurrentUser = Depends(get_current_user_optional),
     ) -> List[str]:
         """
         Get list of accessible document filenames for the current user.
-        
+
         This endpoint returns a simplified list of just the filenames (file_path values)
         from documents that are accessible to the current user based on their permissions.
         Useful for populating dropdown selectors in UI filters.
-        
+
         Args:
             current_user: Current authenticated user (from JWT)
             project_id: Optional project ID filter
             owner: Optional owner user ID filter
             tags: Optional tags filter
-            
+
         Returns:
             List[str]: List of unique filenames that the user has access to
-            
+
         Raises:
             HTTPException: If an error occurs while retrieving documents (500)
         """
@@ -2979,7 +2996,7 @@ def create_document_routes(
                 owner=owner,
                 tags=normalize_tag_items(tags),
             )
-            
+
             # Get accessible documents
             accessible_docs = await get_user_accessible_files(
                 rag.doc_status,
@@ -2990,17 +3007,17 @@ def create_document_routes(
                 filters=filters,
                 required_permission=Permission.VIEW,
             )
-            
+
             # Extract unique filenames
             filenames = set()
             for doc_status in accessible_docs.values():
                 file_path = doc_file_path(doc_status)
                 if file_path and file_path.strip():
                     filenames.add(file_path)
-            
+
             # Return sorted list
             return sorted(list(filenames))
-            
+
         except Exception as e:
             logger.error(f"Error GET /documents/list: {str(e)}")
             logger.error(traceback.format_exc())
@@ -3013,24 +3030,26 @@ def create_document_routes(
     )
     async def get_user_projects(
         owner: Optional[str] = Query(None, description="Filter by owner user ID"),
-        tags: Optional[str] = Query(None, description="Filter by tags (JSON array or comma separated)"),
+        tags: Optional[str] = Query(
+            None, description="Filter by tags (JSON array or comma separated)"
+        ),
         current_user: CurrentUser = Depends(get_current_user_optional),
     ) -> List[str]:
         """
         Get list of unique project IDs from documents accessible to the current user.
-        
+
         This endpoint returns a list of unique project_id values from the metadata
         of all documents that the authenticated user has access to. Useful for
         populating project filter dropdowns.
-        
+
         Args:
             current_user: Current authenticated user (from JWT)
             owner: Optional owner user ID filter
             tags: Optional tags filter
-            
+
         Returns:
             List[str]: List of unique project IDs sorted alphabetically
-            
+
         Raises:
             HTTPException: If an error occurs while retrieving documents (500)
         """
@@ -3041,7 +3060,7 @@ def create_document_routes(
                 owner=owner,
                 tags=normalize_tag_items(tags),
             )
-            
+
             # Get accessible documents
             accessible_docs = await get_user_accessible_files(
                 rag.doc_status,
@@ -3052,7 +3071,7 @@ def create_document_routes(
                 filters=filters,
                 required_permission=Permission.VIEW,
             )
-            
+
             # Extract unique project IDs
             project_ids = set()
             for doc_status in accessible_docs.values():
@@ -3060,14 +3079,14 @@ def create_document_routes(
                 if metadata_source is None and isinstance(doc_status, dict):
                     metadata_source = doc_status.get("metadata")
                 metadata = metadata_source or {}
-                
+
                 project_id = metadata.get("project_id")
                 if project_id and str(project_id).strip():
                     project_ids.add(str(project_id).strip())
-            
+
             # Return sorted list
             return sorted(list(project_ids))
-            
+
         except Exception as e:
             logger.error(f"Error GET /documents/projects: {str(e)}")
             logger.error(traceback.format_exc())

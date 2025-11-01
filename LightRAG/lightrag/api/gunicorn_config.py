@@ -44,7 +44,12 @@ logconfig_dict = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "standard": {"format": get_detailed_log_format().replace("%(asctime)s - %(name)s - %(levelname)s - ", "%(asctime)s [%(levelname)s] %(name)s - ")},
+        "standard": {
+            "format": get_detailed_log_format().replace(
+                "%(asctime)s - %(name)s - %(levelname)s - ",
+                "%(asctime)s [%(levelname)s] %(name)s - ",
+            )
+        },
     },
     "handlers": {
         "console": {
