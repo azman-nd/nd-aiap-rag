@@ -191,7 +191,7 @@ const GraphViewer = () => {
         <div className="absolute top-2 left-2 flex items-start gap-2">
           {/* Doc Filter */}
           <GraphFilterPanel />
-          
+
           {/* Graph Filter Group */}
           <div className="rounded-lg border-2 border-border bg-background/80 backdrop-blur-sm p-2 flex flex-row flex-wrap items-center gap-2">
             <div className="text-xs font-medium text-muted-foreground">
@@ -206,7 +206,7 @@ const GraphViewer = () => {
               />
             )}
           </div>
-          
+
           {/* Refresh Button */}
           <RefreshButton />
         </div>

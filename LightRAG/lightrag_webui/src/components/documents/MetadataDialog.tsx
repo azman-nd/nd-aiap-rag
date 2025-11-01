@@ -15,7 +15,7 @@ interface MetadataDialogProps {
 const formatMetadataValue = (value: any, key?: string): string => {
   if (value === null || value === undefined) return '-'
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
-  
+
   // Format timestamp fields
   if (key && (key.includes('time') || key.includes('timestamp') || key.includes('_at'))) {
     try {
@@ -40,7 +40,7 @@ const formatMetadataValue = (value: any, key?: string): string => {
           // Too small to be a valid timestamp, return as-is
           return String(value)
         }
-        
+
         if (!isNaN(date.getTime())) {
           return date.toLocaleString()
         }
@@ -49,7 +49,7 @@ const formatMetadataValue = (value: any, key?: string): string => {
       // Fall through to default handling
     }
   }
-  
+
   if (Array.isArray(value)) {
     if (value.length === 0) return '-'
     return JSON.stringify(value, null, 2)
@@ -136,4 +136,3 @@ const MetadataDialog: React.FC<MetadataDialogProps> = ({
 }
 
 export default MetadataDialog
-

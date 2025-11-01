@@ -1,0 +1,2763 @@
+trim trailing whitespace.................................................[42mPassed[m
+fix end of files.........................................................[42mPassed[m
+fix requirements.txt.....................................................[42mPassed[m
+ruff-format..............................................................[41mFailed[m
+[2m- hook id: ruff-format[m
+[2m- files were modified by this hook[m
+
+1 file reformatted, 115 files left unchanged
+
+ruff.....................................................................[42mPassed[m
+pre-commit hook(s) made changes.
+If you are seeing this message in CI, reproduce locally with: `pre-commit run --all-files`.
+To run `pre-commit` as part of git workflow, use `pre-commit install`.
+All changes made by hooks:
+[1mdiff --git a/LightRAG/examples/schemes.json b/LightRAG/examples/schemes.json[m
+[1mindex d98737c..450eff7 100644[m
+[1m--- a/LightRAG/examples/schemes.json[m
+[1m+++ b/LightRAG/examples/schemes.json[m
+[36m@@ -8,4 +8,4 @@[m
+             "modelSource": ""[m
+         }[m
+     }[m
+[31m-][m
+\ No newline at end of file[m
+[32m+[m[32m][m
+[1mdiff --git a/LightRAG/lightrag/api/access_control.py b/LightRAG/lightrag/api/access_control.py[m
+[1mindex 150cdc0..a063d28 100644[m
+[1m--- a/LightRAG/lightrag/api/access_control.py[m
+[1m+++ b/LightRAG/lightrag/api/access_control.py[m
+[36m@@ -17,7 +17,7 @@[m [mfrom typing import Any, Dict, Iterable, List, Optional[m
+ from fastapi import HTTPException, Security, status[m
+ from fastapi.security import OAuth2PasswordBearer[m
+ [m
+[31m-from lightrag.base import DocProcessingStatus, DocStatus, QueryParam[m
+[32m+[m[32mfrom lightrag.base import DocProcessingStatus, DocStatus[m
+ from lightrag.constants import GRAPH_FIELD_SEP[m
+ [m
+ from .auth import auth_handler[m
+[36m@@ -50,7 +50,7 @@[m [mclass ShareEntry:[m
+ [m
+     def matches_user(self, user_id: Optional[str], user_roles: Iterable[str]) -> bool:[m
+         """Check whether this entry targets the given user or any of their roles.[m
+[31m-        [m
+[32m+[m
+         Supports wildcards: 'all' or '*' in user target_type matches any authenticated user.[m
+         """[m
+ [m
+[36m@@ -97,7 +97,7 @@[m [mclass AccessFilters:[m
+ class CurrentUser:[m
+     """[m
+     Container for current user information extracted from JWT token[m
+[31m-    [m
+[32m+[m
+     Attributes:[m
+         username: Username from token[m
+         user_id: Unique user identifier (from metadata or username)[m
+[36m@@ -105,7 +105,7 @@[m [mclass CurrentUser:[m
+         metadata: Additional metadata from token[m
+         is_authenticated: Whether user has valid authentication[m
+     """[m
+[31m-    [m
+[32m+[m
+     def __init__([m
+         self,[m
+         username: Optional[str] = None,[m
+[36m@@ -139,7 +139,7 @@[m [mclass CurrentUser:[m
+ [m
+         Args:[m
+             role: Role name to check[m
+[31m-            [m
+[32m+[m
+         Returns:[m
+             True if user has the role[m
+         """[m
+[36m@@ -150,21 +150,21 @@[m [mclass CurrentUser:[m
+ [m
+ [m
+ async def get_current_user_optional([m
+[31m-    token: Optional[str] = Security(oauth2_scheme_optional)[m
+[32m+[m[32m    token: Optional[str] = Security(oauth2_scheme_optional),[m
+ ) -> CurrentUser:[m
+     """[m
+     Extract user information from JWT token (OPTIONAL - doesn't fail if no token)[m
+[31m-    [m
+[32m+[m
+     This function is used as a FastAPI dependency to extract user information[m
+     from the JWT token in the Authorization header. If no token is provided[m
+     or the token is invalid, returns an unauthenticated guest user.[m
+[31m-    [m
+[32m+[m
+     Args:[m
+         token: JWT token from Authorization header (automatically extracted)[m
+[31m-        [m
+[32m+[m
+     Returns:[m
+         CurrentUser object (may be unauthenticated)[m
+[31m-        [m
+[32m+[m
+     Example:[m
+         @router.post("/endpoint")[m
+         async def endpoint(current_user: CurrentUser = Depends(get_current_user_optional)):[m
+[36m@@ -176,45 +176,46 @@[m [masync def get_current_user_optional([m
+     # No token provided - unauthenticated user[m
+     if not token:[m
+         return CurrentUser(is_authenticated=False, role="guest")[m
+[31m-    [m
+[32m+[m
+     try:[m
+         # Use existing auth_handler to validate token[m
+         token_info = auth_handler.validate_token(token)[m
+[31m-        [m
+[32m+[m
+         # Extract user information from token[m
+         # token_info = {"username": str, "role": str, "metadata": dict, "exp": datetime}[m
+         return CurrentUser([m
+             username=token_info.get("username"),[m
+[31m-            user_id=token_info.get("metadata", {}).get("user_id") or token_info.get("username"),[m
+[32m+[m[32m            user_id=token_info.get("metadata", {}).get("user_id")[m
+[32m+[m[32m            or token_info.get("username"),[m
+             role=token_info.get("role", "user"),[m
+             metadata=token_info.get("metadata", {}),[m
+             is_authenticated=True,[m
+             roles=token_info.get("metadata", {}).get("roles"),[m
+         )[m
+[31m-        [m
+[32m+[m
+     except Exception:[m
+         # Invalid token - treat as unauthenticated (don't raise error for optional auth)[m
+         return CurrentUser(is_authenticated=False, role="guest")[m
+ [m
+ [m
+ async def get_current_user_required([m
+[31m-    token: Optional[str] = Security(oauth2_scheme_optional)[m
+[32m+[m[32m    token: Optional[str] = Security(oauth2_scheme_optional),[m
+ ) -> CurrentUser:[m
+     """[m
+     Extract user information from JWT token (REQUIRED - fails if no valid token)[m
+[31m-    [m
+[32m+[m
+     This function is used as a FastAPI dependency for endpoints that require[m
+     authentication. Raises 401 Unauthorized if no token or invalid token.[m
+[31m-    [m
+[32m+[m
+     Args:[m
+         token: JWT token from Authorization header (automatically extracted)[m
+[31m-        [m
+[32m+[m
+     Returns:[m
+         CurrentUser object (always authenticated)[m
+[31m-        [m
+[32m+[m
+     Raises:[m
+         HTTPException: 401 if no token or invalid token[m
+[31m-        [m
+[32m+[m
+     Example:[m
+         @router.post("/protected-endpoint")[m
+         async def endpoint(current_user: CurrentUser = Depends(get_current_user_required)):[m
+[36m@@ -226,14 +227,15 @@[m [masync def get_current_user_required([m
+             detail="Authentication required",[m
+             headers={"WWW-Authenticate": "Bearer"},[m
+         )[m
+[31m-    [m
+[32m+[m
+     # Validate token (will raise HTTPException if invalid)[m
+     token_info = auth_handler.validate_token(token)[m
+[31m-    [m
+[32m+[m
+     # Extract user information[m
+     return CurrentUser([m
+         username=token_info.get("username"),[m
+[31m-        user_id=token_info.get("metadata", {}).get("user_id") or token_info.get("username"),[m
+[32m+[m[32m        user_id=token_info.get("metadata", {}).get("user_id")[m
+[32m+[m[32m        or token_info.get("username"),[m
+         role=token_info.get("role", "user"),[m
+         metadata=token_info.get("metadata", {}),[m
+         is_authenticated=True,[m
+[36m@@ -245,6 +247,7 @@[m [masync def get_current_user_required([m
+ # Metadata normalization helpers[m
+ # ---------------------------------------------------------------------------[m
+ [m
+[32m+[m
+ def normalize_tag_items(raw_tags: Any) -> List[Dict[str, str]]:[m
+     """Normalize user-supplied tag payload into a list of name/value dicts.[m
+ [m
+[36m@@ -327,7 +330,9 @@[m [mdef parse_share_entry(entry: str) -> ShareEntry:[m
+     permission = Permission.from_value(permission_raw)[m
+     if not identifier:[m
+         raise ValueError("Share entry identifier cannot be empty")[m
+[31m-    return ShareEntry(target_type=target_type, permission=permission, identifier=identifier)[m
+[32m+[m[32m    return ShareEntry([m
+[32m+[m[32m        target_type=target_type, permission=permission, identifier=identifier[m
+[32m+[m[32m    )[m
+ [m
+ [m
+ def normalize_share_items(raw_share: Any) -> List[ShareEntry]:[m
+[36m@@ -366,7 +371,9 @@[m [mdef normalize_share_items(raw_share: Any) -> List[ShareEntry]:[m
+             try:[m
+                 entry = ShareEntry([m
+                     target_type=str(item.get("target_type", "")).strip().lower(),[m
+[31m-                    permission=Permission.from_value(str(item.get("permission", "view"))),[m
+[32m+[m[32m                    permission=Permission.from_value([m
+[32m+[m[32m                        str(item.get("permission", "view"))[m
+[32m+[m[32m                    ),[m
+                     identifier=str(item.get("identifier", "")).strip(),[m
+                 )[m
+             except ValueError:[m
+[36m@@ -421,15 +428,27 @@[m [mdef metadata_share_entries(metadata: Dict[str, Any]) -> List[ShareEntry]:[m
+         owner = access_control.get("owner")[m
+         if owner:[m
+             entries.append([m
+[31m-                ShareEntry(target_type="user", permission=Permission.EDIT, identifier=str(owner))[m
+[32m+[m[32m                ShareEntry([m
+[32m+[m[32m                    target_type="user",[m
+[32m+[m[32m                    permission=Permission.EDIT,[m
+[32m+[m[32m                    identifier=str(owner),[m
+[32m+[m[32m                )[m
+             )[m
+         for viewer in access_control.get("viewers", []) or []:[m
+             entries.append([m
+[31m-                ShareEntry(target_type="user", permission=Permission.VIEW, identifier=str(viewer))[m
+[32m+[m[32m                ShareEntry([m
+[32m+[m[32m                    target_type="user",[m
+[32m+[m[32m                    permission=Permission.VIEW,[m
+[32m+[m[32m                    identifier=str(viewer),[m
+[32m+[m[32m                )[m
+             )[m
+         for editor in access_control.get("editors", []) or []:[m
+             entries.append([m
+[31m-                ShareEntry(target_type="user", permission=Permission.EDIT, identifier=str(editor))[m
+[32m+[m[32m                ShareEntry([m
+[32m+[m[32m                    target_type="user",[m
+[32m+[m[32m                    permission=Permission.EDIT,[m
+[32m+[m[32m                    identifier=str(editor),[m
+[32m+[m[32m                )[m
+             )[m
+ [m
+     # Deduplicate[m
+[36m@@ -468,6 +487,7 @@[m [mdef metadata_matches_filters(metadata: Dict[str, Any], filters: AccessFilters) -[m
+ # Access evaluation helpers[m
+ # ---------------------------------------------------------------------------[m
+ [m
+[32m+[m
+ async def get_user_accessible_files([m
+     doc_status_storage,[m
+     current_user: CurrentUser,[m
+[36m@@ -486,7 +506,7 @@[m [masync def get_user_accessible_files([m
+     - Role-based access (user has required role)[m
+     - Public access (document is marked as public)[m
+     - Project scoping (optional filter by project)[m
+[31m-    [m
+[32m+[m
+     Args:[m
+         doc_status_storage: Document status storage instance[m
+         current_user: Current user from JWT token (may be unauthenticated)[m
+[36m@@ -495,10 +515,10 @@[m [masync def get_user_accessible_files([m
+         include_public: Include public documents (default: True)[m
+         required_permission: Permission required for the operation (view/edit)[m
+         filters: Additional metadata filters supplied by caller[m
+[31m-        [m
+[32m+[m
+     Returns:[m
+         Dict mapping doc_id -> DocProcessingStatus[m
+[31m-        [m
+[32m+[m
+     Example:[m
+         accessible_files = await get_user_accessible_files([m
+             rag.doc_status,[m
+[36m@@ -513,10 +533,13 @@[m [masync def get_user_accessible_files([m
+     # Get all processed documents[m
+     all_docs = await doc_status_storage.get_docs_by_status(DocStatus.PROCESSED)[m
+     accessible_docs: dict[str, DocProcessingStatus] = {}[m
+[31m-    [m
+[32m+[m
+     # DEBUG: Log total documents found[m
+     from lightrag.utils import logger[m
+[31m-    logger.info(f"DEBUG get_user_accessible_files: Found {len(all_docs)} PROCESSED documents")[m
+[32m+[m
+[32m+[m[32m    logger.info([m
+[32m+[m[32m        f"DEBUG get_user_accessible_files: Found {len(all_docs)} PROCESSED documents"[m
+[32m+[m[32m    )[m
+     logger.info([m
+         f"DEBUG get_user_accessible_files: Filters - project_id={repr(filters.project_id)}, "[m
+         f"owner={repr(filters.owner)}, tags={filters.tags}, "[m
+[36m@@ -556,7 +579,9 @@[m [masync def get_user_accessible_files([m
+         if not current_user.is_authenticated:[m
+             if is_public and include_public:[m
+                 accessible_docs[doc_id] = doc_status[m
+[31m-                logger.info(f"DEBUG get_user_accessible_files: Doc {doc_id} ACCESSIBLE (public, unauthenticated user)")[m
+[32m+[m[32m                logger.info([m
+[32m+[m[32m                    f"DEBUG get_user_accessible_files: Doc {doc_id} ACCESSIBLE (public, unauthenticated user)"[m
+[32m+[m[32m                )[m
+             else:[m
+                 logger.info([m
+                     f"DEBUG get_user_accessible_files: Doc {doc_id} NOT ACCESSIBLE "[m
+[36m@@ -571,7 +596,7 @@[m [masync def get_user_accessible_files([m
+         # Ownership grants full access (check both owner and uploaded_by)[m
+         owner_id = metadata_owner(metadata)[m
+         is_owner = owner_id == user_id if owner_id and user_id else False[m
+[31m-        [m
+[32m+[m
+         # Also check if user uploaded the document[m
+         uploaded_by = metadata.get("uploaded_by")[m
+         is_uploader = uploaded_by == user_id if uploaded_by and user_id else False[m
+[36m@@ -589,20 +614,31 @@[m [masync def get_user_accessible_files([m
+         # Check 1: User is the owner or uploader[m
+         if is_owner or is_uploader:[m
+             has_access = True[m
+[31m-        [m
+[32m+[m
+         # Check 2: Document is shared with user (if not already granted access)[m
+         if not has_access and include_shared and share_entries:[m
+             for entry in share_entries:[m
+[31m-                if entry.matches_user(user_id, user_roles) and entry.allows(required_permission):[m
+[32m+[m[32m                if entry.matches_user(user_id, user_roles) and entry.allows([m
+[32m+[m[32m                    required_permission[m
+[32m+[m[32m                ):[m
+                     has_access = True[m
+                     break[m
+[31m-        [m
+[32m+[m
+         # Check 3: User has role-based access (if not already granted access)[m
+[31m-        if not has_access and has_role_access and required_permission == Permission.VIEW:[m
+[32m+[m[32m        if ([m
+[32m+[m[32m            not has_access[m
+[32m+[m[32m            and has_role_access[m
+[32m+[m[32m            and required_permission == Permission.VIEW[m
+[32m+[m[32m        ):[m
+             has_access = True[m
+[31m-        [m
+[32m+[m
+         # Check 4: Document is public (if not already granted access)[m
+[31m-        if not has_access and is_public and include_public and required_permission == Permission.VIEW:[m
+[32m+[m[32m        if ([m
+[32m+[m[32m            not has_access[m
+[32m+[m[32m            and is_public[m
+[32m+[m[32m            and include_public[m
+[32m+[m[32m            and required_permission == Permission.VIEW[m
+[32m+[m[32m        ):[m
+             has_access = True[m
+ [m
+         if has_access:[m
+[36m@@ -620,50 +656,55 @@[m [masync def get_user_accessible_files([m
+                 f"share_entries={len(share_entries)}, has_role_access={has_role_access}, is_public={is_public})"[m
+             )[m
+ [m
+[31m-    logger.info(f"DEBUG get_user_accessible_files: Returning {len(accessible_docs)} accessible documents")[m
+[32m+[m[32m    logger.info([m
+[32m+[m[32m        f"DEBUG get_user_accessible_files: Returning {len(accessible_docs)} accessible documents"[m
+[32m+[m[32m    )[m
+     return accessible_docs[m
+ [m
+ [m
+ async def filter_chunks_by_access([m
+[31m-    chunks: list[dict],[m
+[31m-    accessible_files: dict[str, DocProcessingStatus][m
+[32m+[m[32m    chunks: list[dict], accessible_files: dict[str, DocProcessingStatus][m
+ ) -> list[dict]:[m
+     """[m
+     Filter chunks to only those from accessible files[m
+[31m-    [m
+[32m+[m
+     Args:[m
+         chunks: List of chunk dictionaries with file_path field[m
+         accessible_files: Mapping of accessible doc IDs to status objects[m
+[31m-        [m
+[32m+[m
+     Returns:[m
+         Filtered list of chunks[m
+     """[m
+     accessible_paths = {[m
+[31m-        path for path in (doc_file_path(status) for status in accessible_files.values()) if path[m
+[32m+[m[32m        path[m
+[32m+[m[32m        for path in (doc_file_path(status) for status in accessible_files.values())[m
+[32m+[m[32m        if path[m
+     }[m
+ [m
+     return [[m
+         chunk[m
+         for chunk in chunks[m
+[31m-        if any(access_path in (chunk.get("file_path") or "") for access_path in accessible_paths)[m
+[32m+[m[32m        if any([m
+[32m+[m[32m            access_path in (chunk.get("file_path") or "")[m
+[32m+[m[32m            for access_path in accessible_paths[m
+[32m+[m[32m        )[m
+     ][m
+ [m
+ [m
+ async def filter_entities_by_access([m
+[31m-    entities: list[dict],[m
+[31m-    accessible_files: dict[str, DocProcessingStatus][m
+[32m+[m[32m    entities: list[dict], accessible_files: dict[str, DocProcessingStatus][m
+ ) -> list[dict]:[m
+     """[m
+     Filter entities to only those from accessible files[m
+[31m-    [m
+[32m+[m
+     Entities can have multiple file_paths (when entity appears in multiple documents)[m
+     separated by GRAPH_FIELD_SEP ("<SEP>"). An entity is accessible if ANY of its[m
+     file_paths are accessible.[m
+[31m-    [m
+[32m+[m
+     Args:[m
+         entities: List of entity dictionaries with file_path field[m
+         accessible_files: List of file_path strings user can access[m
+[31m-        [m
+[32m+[m
+     Returns:[m
+         Filtered list of entities[m
+     """[m
+[36m@@ -671,7 +712,7 @@[m [masync def filter_entities_by_access([m
+     for entity in entities:[m
+         # Entities can have multiple file_paths separated by <SEP>[m
+         entity_file_paths = entity.get("file_path", "").split(GRAPH_FIELD_SEP)[m
+[31m-        [m
+[32m+[m
+         # Check if ANY of the entity's file_paths are accessible[m
+         for accessible_status in accessible_files.values():[m
+             file_path = doc_file_path(accessible_status)[m
+[36m@@ -691,4 +732,3 @@[m [mdef doc_file_path(doc_status: Any) -> Optional[str]:[m
+     if value is None and isinstance(doc_status, dict):[m
+         value = doc_status.get("file_path")[m
+     return value[m
+[31m-[m
+[1mdiff --git a/LightRAG/lightrag/api/gunicorn_config.py b/LightRAG/lightrag/api/gunicorn_config.py[m
+[1mindex ce397cb..dcf5ecf 100644[m
+[1m--- a/LightRAG/lightrag/api/gunicorn_config.py[m
+[1m+++ b/LightRAG/lightrag/api/gunicorn_config.py[m
+[36m@@ -44,7 +44,12 @@[m [mlogconfig_dict = {[m
+     "version": 1,[m
+     "disable_existing_loggers": False,[m
+     "formatters": {[m
+[31m-        "standard": {"format": get_detailed_log_format().replace("%(asctime)s - %(name)s - %(levelname)s - ", "%(asctime)s [%(levelname)s] %(name)s - ")},[m
+[32m+[m[32m        "standard": {[m
+[32m+[m[32m            "format": get_detailed_log_format().replace([m
+[32m+[m[32m                "%(asctime)s - %(name)s - %(levelname)s - ",[m
+[32m+[m[32m                "%(asctime)s [%(levelname)s] %(name)s - ",[m
+[32m+[m[32m            )[m
+[32m+[m[32m        },[m
+     },[m
+     "handlers": {[m
+         "console": {[m
+[1mdiff --git a/LightRAG/lightrag/api/lightrag_server.py b/LightRAG/lightrag/api/lightrag_server.py[m
+[1mindex 968992f..40e5a2e 100644[m
+[1m--- a/LightRAG/lightrag/api/lightrag_server.py[m
+[1m+++ b/LightRAG/lightrag/api/lightrag_server.py[m
+[36m@@ -52,7 +52,12 @@[m [mfrom lightrag.api.routers.query_routes import create_query_routes[m
+ from lightrag.api.routers.graph_routes import create_graph_routes[m
+ from lightrag.api.routers.ollama_api import OllamaAPI[m
+ [m
+[31m-from lightrag.utils import logger, set_verbose_debug, get_log_format, get_detailed_log_format[m
+[32m+[m[32mfrom lightrag.utils import ([m
+[32m+[m[32m    logger,[m
+[32m+[m[32m    set_verbose_debug,[m
+[32m+[m[32m    get_log_format,[m
+[32m+[m[32m    get_detailed_log_format,[m
+[32m+[m[32m)[m
+ from lightrag.kg.shared_storage import ([m
+     get_namespace_data,[m
+     get_pipeline_status_lock,[m
+[1mdiff --git a/LightRAG/lightrag/api/routers/document_routes.py b/LightRAG/lightrag/api/routers/document_routes.py[m
+[1mindex 9cffa44..bc2e743 100644[m
+[1m--- a/LightRAG/lightrag/api/routers/document_routes.py[m
+[1m+++ b/LightRAG/lightrag/api/routers/document_routes.py[m
+[36m@@ -38,7 +38,6 @@[m [mfrom ..access_control import ([m
+     ShareEntry,[m
+     doc_file_path,[m
+     get_current_user_optional,[m
+[31m-    get_current_user_required,[m
+     get_user_accessible_files,[m
+     normalize_share_items,[m
+     normalize_tag_items,[m
+[36m@@ -156,7 +155,9 @@[m [mdef build_access_metadata([m
+         "is_public": bool(is_public),[m
+         "project_id": (project_id or "default").strip() if project_id else "default",[m
+         "tags": tags,[m
+[31m-        "uploaded_by": current_user.username if current_user.is_authenticated else "anonymous",[m
+[32m+[m[32m        "uploaded_by": current_user.username[m
+[32m+[m[32m        if current_user.is_authenticated[m
+[32m+[m[32m        else "anonymous",[m
+         "upload_timestamp": datetime.now(timezone.utc).isoformat(),[m
+     }[m
+ [m
+[36m@@ -258,10 +259,18 @@[m [mclass ScanRequest(BaseModel):[m
+     """Request model for document scanning operations."""[m
+ [m
+     schemeConfig: SchemeConfig = Field(..., description="Scanning scheme configuration")[m
+[31m-    project_id: Optional[str] = Field(None, description="Project identifier for grouping documents")[m
+[31m-    is_public: bool = Field(False, description="Whether documents are publicly accessible")[m
+[31m-    tags: Optional[List[Dict[str, str]]] = Field(None, description="Tags for categorizing documents")[m
+[31m-    share: Optional[List[ShareEntry]] = Field(None, description="Share entries for access control")[m
+[32m+[m[32m    project_id: Optional[str] = Field([m
+[32m+[m[32m        None, description="Project identifier for grouping documents"[m
+[32m+[m[32m    )[m
+[32m+[m[32m    is_public: bool = Field([m
+[32m+[m[32m        False, description="Whether documents are publicly accessible"[m
+[32m+[m[32m    )[m
+[32m+[m[32m    tags: Optional[List[Dict[str, str]]] = Field([m
+[32m+[m[32m        None, description="Tags for categorizing documents"[m
+[32m+[m[32m    )[m
+[32m+[m[32m    share: Optional[List[ShareEntry]] = Field([m
+[32m+[m[32m        None, description="Share entries for access control"[m
+[32m+[m[32m    )[m
+     owner: Optional[str] = Field(None, description="Explicit owner user ID")[m
+ [m
+ [m
+[36m@@ -354,13 +363,19 @@[m [mclass InsertTextRequest(BaseModel):[m
+     )[m
+     file_source: str = Field(default=None, min_length=0, description="File Source")[m
+     project_id: Optional[str] = Field(default=None, description="Project identifier")[m
+[31m-    is_public: bool = Field(default=False, description="Whether document is publicly accessible")[m
+[31m-    tags: Optional[list[TagSpec]] = Field(default=None, description="List of tags (name/value pairs)")[m
+[32m+[m[32m    is_public: bool = Field([m
+[32m+[m[32m        default=False, description="Whether document is publicly accessible"[m
+[32m+[m[32m    )[m
+[32m+[m[32m    tags: Optional[list[TagSpec]] = Field([m
+[32m+[m[32m        default=None, description="List of tags (name/value pairs)"[m
+[32m+[m[32m    )[m
+     share: Optional[list[ShareSpec]] = Field([m
+[31m-        default=None, description="List of share entries granting view or edit permissions"[m
+[32m+[m[32m        default=None,[m
+[32m+[m[32m        description="List of share entries granting view or edit permissions",[m
+     )[m
+     owner: Optional[str] = Field([m
+[31m-        default=None, description="Explicit owner user id (defaults to authenticated user)"[m
+[32m+[m[32m        default=None,[m
+[32m+[m[32m        description="Explicit owner user id (defaults to authenticated user)",[m
+     )[m
+ [m
+     @field_validator("text", mode="after")[m
+[36m@@ -387,7 +402,11 @@[m [mclass InsertTextRequest(BaseModel):[m
+                 "is_public": False,[m
+                 "tags": [{"name": "department", "value": "finance"}],[m
+                 "share": [[m
+[31m-                    {"target_type": "user", "permission": "view", "identifier": "user-b"}[m
+[32m+[m[32m                    {[m
+[32m+[m[32m                        "target_type": "user",[m
+[32m+[m[32m                        "permission": "view",[m
+[32m+[m[32m                        "identifier": "user-b",[m
+[32m+[m[32m                    }[m
+                 ],[m
+             }[m
+         }[m
+[36m@@ -414,13 +433,19 @@[m [mclass InsertTextsRequest(BaseModel):[m
+         default=None, min_length=0, description="Sources of the texts"[m
+     )[m
+     project_id: Optional[str] = Field(default=None, description="Project identifier")[m
+[31m-    is_public: bool = Field(default=False, description="Whether documents are publicly accessible")[m
+[31m-    tags: Optional[list[TagSpec]] = Field(default=None, description="List of tags (name/value pairs)")[m
+[32m+[m[32m    is_public: bool = Field([m
+[32m+[m[32m        default=False, description="Whether documents are publicly accessible"[m
+[32m+[m[32m    )[m
+[32m+[m[32m    tags: Optional[list[TagSpec]] = Field([m
+[32m+[m[32m        default=None, description="List of tags (name/value pairs)"[m
+[32m+[m[32m    )[m
+     share: Optional[list[ShareSpec]] = Field([m
+[31m-        default=None, description="List of share entries granting view or edit permissions"[m
+[32m+[m[32m        default=None,[m
+[32m+[m[32m        description="List of share entries granting view or edit permissions",[m
+     )[m
+     owner: Optional[str] = Field([m
+[31m-        default=None, description="Explicit owner user id (defaults to authenticated user)"[m
+[32m+[m[32m        default=None,[m
+[32m+[m[32m        description="Explicit owner user id (defaults to authenticated user)",[m
+     )[m
+ [m
+     @field_validator("texts", mode="after")[m
+[36m@@ -454,7 +479,11 @@[m [mclass InsertTextsRequest(BaseModel):[m
+                     {"name": "quarter", "value": "Q1"},[m
+                 ],[m
+                 "share": [[m
+[31m-                    {"target_type": "role", "permission": "view", "identifier": "analyst"}[m
+[32m+[m[32m                    {[m
+[32m+[m[32m                        "target_type": "role",[m
+[32m+[m[32m                        "permission": "view",[m
+[32m+[m[32m                        "identifier": "analyst",[m
+[32m+[m[32m                    }[m
+                 ],[m
+             }[m
+         }[m
+[36m@@ -1669,7 +1698,7 @@[m [masync def pipeline_index_texts([m
+                 file_sources.append("unknown_source")[m
+                 for _ in range(len(file_sources), len(texts))[m
+             ][m
+[31m-    [m
+[32m+[m
+     # Enqueue documents[m
+     await rag.apipeline_enqueue_documents([m
+         input=texts,[m
+[36m@@ -1677,32 +1706,34 @@[m [masync def pipeline_index_texts([m
+         track_id=track_id,[m
+         metadata=metadata,[m
+     )[m
+[31m-    [m
+[32m+[m
+     # If metadata is provided, update the doc_status entries with metadata[m
+     if metadata:[m
+         # Get the doc IDs that were just enqueued[m
+         from lightrag.utils import compute_mdhash_id, sanitize_text_for_encoding[m
+[31m-        [m
+[32m+[m
+         for text, file_source in zip(texts, file_sources or [None] * len(texts)):[m
+             cleaned_content = sanitize_text_for_encoding(text)[m
+             doc_id = compute_mdhash_id(cleaned_content, prefix="doc-")[m
+[31m-            [m
+[32m+[m
+             # Get current doc_status and update with metadata[m
+             current_doc_status = await rag.doc_status.get_by_id(doc_id)[m
+             if current_doc_status:[m
+                 # Merge metadata with existing metadata[m
+                 existing_metadata = current_doc_status.get("metadata", {})[m
+                 merged_metadata = {**existing_metadata, **metadata}[m
+[31m-                [m
+[31m-                await rag.doc_status.upsert({[m
+[31m-                    doc_id: {[m
+[31m-                        **current_doc_status,[m
+[31m-                        "metadata": merged_metadata,[m
+[31m-                        "updated_at": datetime.now(timezone.utc).isoformat(),[m
+[32m+[m
+[32m+[m[32m                await rag.doc_status.upsert([m
+[32m+[m[32m                    {[m
+[32m+[m[32m                        doc_id: {[m
+[32m+[m[32m                            **current_doc_status,[m
+[32m+[m[32m                            "metadata": merged_metadata,[m
+[32m+[m[32m                            "updated_at": datetime.now(timezone.utc).isoformat(),[m
+[32m+[m[32m                        }[m
+                     }[m
+[31m-                })[m
+[32m+[m[32m                )[m
+                 logger.debug(f"Updated doc_status with metadata for {doc_id}")[m
+[31m-    [m
+[32m+[m
+     await rag.apipeline_process_enqueue_documents()[m
+ [m
+ [m
+[36m@@ -1746,15 +1777,27 @@[m [masync def run_scanning_process([m
+             # This is important for retry scenarios[m
+             if metadata is None:[m
+                 try:[m
+[31m-                    failed_docs = await rag.doc_status.get_docs_by_status(DocStatus.FAILED)[m
+[32m+[m[32m                    failed_docs = await rag.doc_status.get_docs_by_status([m
+[32m+[m[32m                        DocStatus.FAILED[m
+[32m+[m[32m                    )[m
+                     for file_path in new_files:[m
+                         filename = file_path.name[m
+                         for doc_id, doc_status in failed_docs.items():[m
+[31m-                            doc_file_path = doc_status.get("file_path") if isinstance(doc_status, dict) else getattr(doc_status, "file_path", None)[m
+[32m+[m[32m                            doc_file_path = ([m
+[32m+[m[32m                                doc_status.get("file_path")[m
+[32m+[m[32m                                if isinstance(doc_status, dict)[m
+[32m+[m[32m                                else getattr(doc_status, "file_path", None)[m
+[32m+[m[32m                            )[m
+                             if doc_file_path == filename:[m
+[31m-                                failed_metadata = doc_status.get("metadata") if isinstance(doc_status, dict) else getattr(doc_status, "metadata", {})[m
+[32m+[m[32m                                failed_metadata = ([m
+[32m+[m[32m                                    doc_status.get("metadata")[m
+[32m+[m[32m                                    if isinstance(doc_status, dict)[m
+[32m+[m[32m                                    else getattr(doc_status, "metadata", {})[m
+[32m+[m[32m                                )[m
+                                 if failed_metadata:[m
+[31m-                                    logger.info(f"Found failed document metadata for {filename}, will reuse for retry")[m
+[32m+[m[32m                                    logger.info([m
+[32m+[m[32m                                        f"Found failed document metadata for {filename}, will reuse for retry"[m
+[32m+[m[32m                                    )[m
+                                     # Note: This reuses metadata from first found failed doc[m
+                                     # If scanning multiple files, they all get the same metadata[m
+                                     # This is acceptable for retry scenarios[m
+[36m@@ -1764,7 +1807,7 @@[m [masync def run_scanning_process([m
+                             break  # Found metadata, use it for all files[m
+                 except Exception as e:[m
+                     logger.warning(f"Could not check for failed document metadata: {e}")[m
+[31m-            [m
+[32m+[m
+             # Process all files at once with track_id[m
+             if is_pipeline_busy:[m
+                 logger.info([m
+[36m@@ -2247,7 +2290,7 @@[m [mdef create_document_routes([m
+         "/scan", response_model=ScanResponse, dependencies=[Depends(combined_auth)][m
+     )[m
+     async def scan_for_new_documents([m
+[31m-        request: ScanRequest, [m
+[32m+[m[32m        request: ScanRequest,[m
+         background_tasks: BackgroundTasks,[m
+         current_user: CurrentUser = Depends(get_current_user_optional),[m
+     ):[m
+[36m@@ -2271,7 +2314,13 @@[m [mdef create_document_routes([m
+ [m
+         # Build access control metadata if provided[m
+         metadata = None[m
+[31m-        if request.project_id or request.tags or request.share or request.owner or request.is_public:[m
+[32m+[m[32m        if ([m
+[32m+[m[32m            request.project_id[m
+[32m+[m[32m            or request.tags[m
+[32m+[m[32m            or request.share[m
+[32m+[m[32m            or request.owner[m
+[32m+[m[32m            or request.is_public[m
+[32m+[m[32m        ):[m
+             metadata = build_access_metadata([m
+                 current_user=current_user,[m
+                 project_id=request.project_id,[m
+[36m@@ -2318,7 +2367,7 @@[m [mdef create_document_routes([m
+         This API endpoint accepts a file through an HTTP POST request, checks if the[m
+         uploaded file is of a supported type, saves it in the specified input directory,[m
+         indexes it for retrieval, and returns a success status with relevant details.[m
+[31m-        [m
+[32m+[m
+         User identity is automatically extracted from JWT token in Authorization header.[m
+         Access control metadata is stored with the document.[m
+ [m
+[36m@@ -2365,41 +2414,16 @@[m [mdef create_document_routes([m
+                 shutil.copyfileobj(file.file, buffer)[m
+ [m
+             track_id = generate_track_id("upload")[m
+[31m-            [m
+[31m-            # Check if this file was previously processed and failed[m
+[31m-            # If so, retrieve and reuse the metadata for retry[m
+[31m-            doc_pre_id = f"doc-pre-{safe_filename}"[m
+[31m-            existing_failed_doc = None[m
+[31m-            try:[m
+[31m-                # Check for existing doc-pre-* first[m
+[31m-                existing_pre_doc = await rag.doc_status.get_by_id(doc_pre_id)[m
+[31m-                if existing_pre_doc and existing_pre_doc.get("metadata"):[m
+[31m-                    logger.info(f"Found existing doc-pre-* metadata for {safe_filename}, will merge with new metadata")[m
+[31m-                    # Merge: new metadata takes precedence, but preserve fields not provided[m
+[31m-                    existing_metadata = existing_pre_doc.get("metadata", {})[m
+[31m-                    for key, value in existing_metadata.items():[m
+[31m-                        if key not in metadata or metadata[key] in [None, "", [], {}]:[m
+[31m-                            metadata[key] = value[m
+[31m-                            logger.info(f"Preserved metadata field '{key}' from previous attempt")[m
+[31m-                [m
+[31m-                # Also check for failed documents with same filename[m
+[31m-                failed_docs = await rag.doc_status.get_docs_by_status(DocStatus.FAILED)[m
+[31m-                for doc_id, doc_status in failed_docs.items():[m
+[31m-                    doc_file_path = doc_status.get("file_path") if isinstance(doc_status, dict) else getattr(doc_status, "file_path", None)[m
+[31m-                    if doc_file_path == safe_filename:[m
+[31m-                        existing_failed_doc = doc_status[m
+[31m-                        logger.info(f"Found failed document {doc_id} for file {safe_filename}")[m
+[31m-                        # Merge metadata from failed document[m
+[31m-                        failed_metadata = doc_status.get("metadata") if isinstance(doc_status, dict) else getattr(doc_status, "metadata", {})[m
+[31m-                        if failed_metadata:[m
+[31m-                            for key, value in failed_metadata.items():[m
+[31m-                                if key not in metadata or metadata[key] in [None, "", [], {}]:[m
+[31m-                                    metadata[key] = value[m
+[31m-                                    logger.info(f"Preserved metadata field '{key}' from failed document")[m
+[31m-                        break[m
+[31m-            except Exception as e:[m
+[31m-                logger.warning(f"Could not check for existing metadata: {e}")[m
+[31m-                # Continue with provided metadata[m
+[32m+[m
+[32m+[m[32m            # Parse JSON strings for access control - build metadata from request parameters[m
+[32m+[m[32m            metadata = build_access_metadata([m
+[32m+[m[32m                current_user=current_user,[m
+[32m+[m[32m                project_id=project_id,[m
+[32m+[m[32m                is_public=is_public,[m
+[32m+[m[32m                raw_tags=tags,[m
+[32m+[m[32m                raw_share=share,[m
+[32m+[m[32m                owner=owner,[m
+[32m+[m[32m            )[m
+ [m
+             def load_config():[m
+                 try:[m
+[36m@@ -2422,16 +2446,6 @@[m [mdef create_document_routes([m
+             current_modelSource = config.get("modelSource")[m
+             doc_pre_id = f"doc-pre-{safe_filename}"[m
+ [m
+[31m-            # Parse JSON strings for access control[m
+[31m-            metadata = build_access_metadata([m
+[31m-                current_user=current_user,[m
+[31m-                project_id=project_id,[m
+[31m-                is_public=is_public,[m
+[31m-                raw_tags=tags,[m
+[31m-                raw_share=share,[m
+[31m-                owner=owner,[m
+[31m-            )[m
+[31m-[m
+             logger.info([m
+                 "Document upload metadata: owner=%s, project_id=%s, is_public=%s, share=%s",[m
+                 metadata.get("owner"),[m
+[36m@@ -2463,8 +2477,9 @@[m [mdef create_document_routes([m
+                     metadata=metadata,[m
+                 )[m
+ [m
+[31m-            [m
+[31m-            logger.info(f"AZ>> doc_status added, contains metadata {metadata}, track_id {track_id}")[m
+[32m+[m[32m            logger.info([m
+[32m+[m[32m                f"AZ>> doc_status added, contains metadata {metadata}, track_id {track_id}"[m
+[32m+[m[32m            )[m
+             await rag.doc_status.upsert([m
+                 {[m
+                     doc_pre_id: {[m
+[36m@@ -2497,7 +2512,7 @@[m [mdef create_document_routes([m
+         "/text", response_model=InsertResponse, dependencies=[Depends(combined_auth)][m
+     )[m
+     async def insert_text([m
+[31m-        request: InsertTextRequest, [m
+[32m+[m[32m        request: InsertTextRequest,[m
+         background_tasks: BackgroundTasks,[m
+         current_user: CurrentUser = Depends(get_current_user_optional),[m
+     ):[m
+[36m@@ -2564,7 +2579,7 @@[m [mdef create_document_routes([m
+         dependencies=[Depends(combined_auth)],[m
+     )[m
+     async def insert_texts([m
+[31m-        request: InsertTextsRequest, [m
+[32m+[m[32m        request: InsertTextsRequest,[m
+         background_tasks: BackgroundTasks,[m
+         current_user: CurrentUser = Depends(get_current_user_optional),[m
+     ):[m
+[36m@@ -2950,25 +2965,27 @@[m [mdef create_document_routes([m
+     async def get_document_filenames([m
+         project_id: Optional[str] = Query(None, description="Filter by project ID"),[m
+         owner: Optional[str] = Query(None, description="Filter by owner user ID"),[m
+[31m-        tags: Optional[str] = Query(None, description="Filter by tags (JSON array or comma separated)"),[m
+[32m+[m[32m        tags: Optional[str] = Query([m
+[32m+[m[32m            None, description="Filter by tags (JSON array or comma separated)"[m
+[32m+[m[32m        ),[m
+         current_user: CurrentUser = Depends(get_current_user_optional),[m
+     ) -> List[str]:[m
+         """[m
+         Get list of accessible document filenames for the current user.[m
+[31m-        [m
+[32m+[m
+         This endpoint returns a simplified list of just the filenames (file_path values)[m
+         from documents that are accessible to the current user based on their permissions.[m
+         Useful for populating dropdown selectors in UI filters.[m
+[31m-        [m
+[32m+[m
+         Args:[m
+             current_user: Current authenticated user (from JWT)[m
+             project_id: Optional project ID filter[m
+             owner: Optional owner user ID filter[m
+             tags: Optional tags filter[m
+[31m-            [m
+[32m+[m
+         Returns:[m
+             List[str]: List of unique filenames that the user has access to[m
+[31m-            [m
+[32m+[m
+         Raises:[m
+             HTTPException: If an error occurs while retrieving documents (500)[m
+         """[m
+[36m@@ -2979,7 +2996,7 @@[m [mdef create_document_routes([m
+                 owner=owner,[m
+                 tags=normalize_tag_items(tags),[m
+             )[m
+[31m-            [m
+[32m+[m
+             # Get accessible documents[m
+             accessible_docs = await get_user_accessible_files([m
+                 rag.doc_status,[m
+[36m@@ -2990,17 +3007,17 @@[m [mdef create_document_routes([m
+                 filters=filters,[m
+                 required_permission=Permission.VIEW,[m
+             )[m
+[31m-            [m
+[32m+[m
+             # Extract unique filenames[m
+             filenames = set()[m
+             for doc_status in accessible_docs.values():[m
+                 file_path = doc_file_path(doc_status)[m
+                 if file_path and file_path.strip():[m
+                     filenames.add(file_path)[m
+[31m-            [m
+[32m+[m
+             # Return sorted list[m
+             return sorted(list(filenames))[m
+[31m-            [m
+[32m+[m
+         except Exception as e:[m
+             logger.error(f"Error GET /documents/list: {str(e)}")[m
+             logger.error(traceback.format_exc())[m
+[36m@@ -3013,24 +3030,26 @@[m [mdef create_document_routes([m
+     )[m
+     async def get_user_projects([m
+         owner: Optional[str] = Query(None, description="Filter by owner user ID"),[m
+[31m-        tags: Optional[str] = Query(None, description="Filter by tags (JSON array or comma separated)"),[m
+[32m+[m[32m        tags: Optional[str] = Query([m
+[32m+[m[32m            None, description="Filter by tags (JSON array or comma separated)"[m
+[32m+[m[32m        ),[m
+         current_user: CurrentUser = Depends(get_current_user_optional),[m
+     ) -> List[str]:[m
+         """[m
+         Get list of unique project IDs from documents accessible to the current user.[m
+[31m-        [m
+[32m+[m
+         This endpoint returns a list of unique project_id values from the metadata[m
+         of all documents that the authenticated user has access to. Useful for[m
+         populating project filter dropdowns.[m
+[31m-        [m
+[32m+[m
+         Args:[m
+             current_user: Current authenticated user (from JWT)[m
+             owner: Optional owner user ID filter[m
+             tags: Optional tags filter[m
+[31m-            [m
+[32m+[m
+         Returns:[m
+             List[str]: List of unique project IDs sorted alphabetically[m
+[31m-            [m
+[32m+[m
+         Raises:[m
+             HTTPException: If an error occurs while retrieving documents (500)[m
+         """[m
+[36m@@ -3041,7 +3060,7 @@[m [mdef create_document_routes([m
+                 owner=owner,[m
+                 tags=normalize_tag_items(tags),[m
+             )[m
+[31m-            [m
+[32m+[m
+             # Get accessible documents[m
+             accessible_docs = await get_user_accessible_files([m
+                 rag.doc_status,[m
+[36m@@ -3052,7 +3071,7 @@[m [mdef create_document_routes([m
+                 filters=filters,[m
+                 required_permission=Permission.VIEW,[m
+             )[m
+[31m-            [m
+[32m+[m
+             # Extract unique project IDs[m
+             project_ids = set()[m
+             for doc_status in accessible_docs.values():[m
+[36m@@ -3060,14 +3079,14 @@[m [mdef create_document_routes([m
+                 if metadata_source is None and isinstance(doc_status, dict):[m
+                     metadata_source = doc_status.get("metadata")[m
+                 metadata = metadata_source or {}[m
+[31m-                [m
+[32m+[m
+                 project_id = metadata.get("project_id")[m
+                 if project_id and str(project_id).strip():[m
+                     project_ids.add(str(project_id).strip())[m
+[31m-            [m
+[32m+[m
+             # Return sorted list[m
+             return sorted(list(project_ids))[m
+[31m-            [m
+[32m+[m
+         except Exception as e:[m
+             logger.error(f"Error GET /documents/projects: {str(e)}")[m
+             logger.error(traceback.format_exc())[m
+[1mdiff --git a/LightRAG/lightrag/api/routers/graph_routes.py b/LightRAG/lightrag/api/routers/graph_routes.py[m
+[1mindex 197cb89..655b746 100644[m
+[1m--- a/LightRAG/lightrag/api/routers/graph_routes.py[m
+[1m+++ b/LightRAG/lightrag/api/routers/graph_routes.py[m
+[36m@@ -127,7 +127,9 @@[m [mdef create_graph_routes(rag, api_key: Optional[str] = None):[m
+             )[m
+ [m
+             # DEBUG: Log accessible documents count[m
+[31m-            logger.info(f"DEBUG get_knowledge_graph: Found {len(accessible_docs)} accessible documents")[m
+[32m+[m[32m            logger.info([m
+[32m+[m[32m                f"DEBUG get_knowledge_graph: Found {len(accessible_docs)} accessible documents"[m
+[32m+[m[32m            )[m
+ [m
+             if not accessible_docs:[m
+                 raise HTTPException([m
+[36m@@ -143,7 +145,11 @@[m [mdef create_graph_routes(rag, api_key: Optional[str] = None):[m
+             )[m
+ [m
+             accessible_paths = [[m
+[31m-                path for path in (doc_file_path(status) for status in accessible_docs.values()) if path[m
+[32m+[m[32m                path[m
+[32m+[m[32m                for path in ([m
+[32m+[m[32m                    doc_file_path(status) for status in accessible_docs.values()[m
+[32m+[m[32m                )[m
+[32m+[m[32m                if path[m
+             ][m
+ [m
+             def node_accessible(node: Any) -> bool:[m
+[36m@@ -159,7 +165,9 @@[m [mdef create_graph_routes(rag, api_key: Optional[str] = None):[m
+                     if isinstance(value, str):[m
+                         file_values.append(value)[m
+                     elif isinstance(value, list):[m
+[31m-                        file_values.extend([str(v) for v in value if isinstance(v, str)])[m
+[32m+[m[32m                        file_values.extend([m
+[32m+[m[32m                            [str(v) for v in value if isinstance(v, str)][m
+[32m+[m[32m                        )[m
+ [m
+                 if not file_values:[m
+                     return True[m
+[36m@@ -180,7 +188,11 @@[m [mdef create_graph_routes(rag, api_key: Optional[str] = None):[m
+             nodes = graph_dict.get("nodes", [])[m
+             filtered_nodes = [node for node in nodes if node_accessible(node)][m
+             allowed_ids = {[m
+[31m-                (node.get("id") if isinstance(node, dict) else getattr(node, "id", None))[m
+[32m+[m[32m                ([m
+[32m+[m[32m                    node.get("id")[m
+[32m+[m[32m                    if isinstance(node, dict)[m
+[32m+[m[32m                    else getattr(node, "id", None)[m
+[32m+[m[32m                )[m
+                 for node in filtered_nodes[m
+             }[m
+ [m
+[1mdiff --git a/LightRAG/lightrag/api/routers/query_routes.py b/LightRAG/lightrag/api/routers/query_routes.py[m
+[1mindex c8317e5..79f9438 100644[m
+[1m--- a/LightRAG/lightrag/api/routers/query_routes.py[m
+[1m+++ b/LightRAG/lightrag/api/routers/query_routes.py[m
+[36m@@ -51,16 +51,19 @@[m [mclass AccessFilterPayload(BaseModel):[m
+     """Metadata filters provided by the client to scope query results."""[m
+ [m
+     project_id: Optional[str] = Field([m
+[31m-        default=None, description="Project identifier used to scope accessible documents"[m
+[32m+[m[32m        default=None,[m
+[32m+[m[32m        description="Project identifier used to scope accessible documents",[m
+     )[m
+     owner: Optional[str] = Field([m
+         default=None, description="Owner user id used to scope accessible documents"[m
+     )[m
+     tags: Optional[List[TagFilter]] = Field([m
+[31m-        default=None, description="List of tags (name/value pairs) that documents must contain"[m
+[32m+[m[32m        default=None,[m
+[32m+[m[32m        description="List of tags (name/value pairs) that documents must contain",[m
+     )[m
+     filename: Optional[str] = Field([m
+[31m-        default=None, description="Filter by document filename (supports partial matching)"[m
+[32m+[m[32m        default=None,[m
+[32m+[m[32m        description="Filter by document filename (supports partial matching)",[m
+     )[m
+ [m
+     @field_validator("project_id", "owner", "filename", mode="after")[m
+[36m@@ -195,11 +198,7 @@[m [mdef build_access_filters(payload: AccessFilterPayload | None) -> AccessFilters:[m
+     if payload is None:[m
+         return AccessFilters()[m
+ [m
+[31m-    tags_payload = ([m
+[31m-        [tag.model_dump() for tag in payload.tags][m
+[31m-        if payload.tags[m
+[31m-        else None[m
+[31m-    )[m
+[32m+[m[32m    tags_payload = [tag.model_dump() for tag in payload.tags] if payload.tags else None[m
+     tags = normalize_tag_items(tags_payload)[m
+     return AccessFilters([m
+         project_id=payload.project_id,[m
+[36m@@ -253,10 +252,10 @@[m [mdef create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):[m
+     ):[m
+         """[m
+         Handle a POST request at the /query endpoint to process user queries using RAG capabilities.[m
+[31m-        [m
+[32m+[m
+         Document ID filtering: The system now filters results by document IDs during retrieval.[m
+         - Vector databases filter chunks by full_doc_id field (supported in Milvus, MongoDB, PostgreSQL, Qdrant, Faiss, NanoVectorDB)[m
+[31m-        - Graph databases filter entities/relationships by their source_id (chunk IDs) [m
+[32m+[m[32m        - Graph databases filter entities/relationships by their source_id (chunk IDs)[m
+         - See _get_chunk_ids_for_doc_ids() in operate.py for the doc_id → chunk_id mapping logic[m
+ [m
+         Parameters:[m
+[36m@@ -283,7 +282,7 @@[m [mdef create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):[m
+                 filters=filters,[m
+                 required_permission=Permission.VIEW,[m
+             )[m
+[31m-            [m
+[32m+[m
+             if not accessible_docs:[m
+                 detail = ([m
+                     "No accessible documents found for the provided metadata filters."[m
+[36m@@ -294,7 +293,9 @@[m [mdef create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):[m
+ [m
+             apply_doc_id_filter(param, accessible_docs)[m
+ [m
+[31m-            logger.info(f"[query_text] Invoking rag.aquery() with param.ids={param.ids}")[m
+[32m+[m[32m            logger.info([m
+[32m+[m[32m                f"[query_text] Invoking rag.aquery() with param.ids={param.ids}"[m
+[32m+[m[32m            )[m
+             response = await rag.aquery(request.query, param=param)[m
+ [m
+             if isinstance(response, str):[m
+[36m@@ -336,7 +337,7 @@[m [mdef create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):[m
+                 filters=filters,[m
+                 required_permission=Permission.VIEW,[m
+             )[m
+[31m-            [m
+[32m+[m
+             if not accessible_docs:[m
+                 raise HTTPException([m
+                     status_code=403,[m
+[36m@@ -345,7 +346,9 @@[m [mdef create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):[m
+ [m
+             apply_doc_id_filter(param, accessible_docs)[m
+ [m
+[31m-            logger.info(f"[query_text_stream] Invoking rag.aquery() with param.ids={param.ids}")[m
+[32m+[m[32m            logger.info([m
+[32m+[m[32m                f"[query_text_stream] Invoking rag.aquery() with param.ids={param.ids}"[m
+[32m+[m[32m            )[m
+             response = await rag.aquery(request.query, param=param)[m
+ [m
+             async def stream_generator():[m
+[36m@@ -418,7 +421,7 @@[m [mdef create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):[m
+                 filters=filters,[m
+                 required_permission=Permission.VIEW,[m
+             )[m
+[31m-            [m
+[32m+[m
+             if not accessible_docs:[m
+                 raise HTTPException([m
+                     status_code=403,[m
+[36m@@ -427,7 +430,9 @@[m [mdef create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):[m
+ [m
+             apply_doc_id_filter(param, accessible_docs)[m
+ [m
+[31m-            logger.info(f"[query_data] Invoking rag.aquery_data() with param.ids={param.ids}")[m
+[32m+[m[32m            logger.info([m
+[32m+[m[32m                f"[query_data] Invoking rag.aquery_data() with param.ids={param.ids}"[m
+[32m+[m[32m            )[m
+             response = await rag.aquery_data(request.query, param=param)[m
+ [m
+             # The aquery_data method returns a dict with entities, relationships, chunks, and metadata[m
+[36m@@ -449,7 +454,11 @@[m [mdef create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):[m
+                     metadata = {}[m
+ [m
+                 accessible_paths = [[m
+[31m-                    path for path in (doc_file_path(status) for status in accessible_docs.values()) if path[m
+[32m+[m[32m                    path[m
+[32m+[m[32m                    for path in ([m
+[32m+[m[32m                        doc_file_path(status) for status in accessible_docs.values()[m
+[32m+[m[32m                    )[m
+[32m+[m[32m                    if path[m
+                 ][m
+                 metadata.update([m
+                     {[m
+[1mdiff --git a/LightRAG/lightrag/base.py b/LightRAG/lightrag/base.py[m
+[1mindex d9232ce..e78420f 100644[m
+[1m--- a/LightRAG/lightrag/base.py[m
+[1m+++ b/LightRAG/lightrag/base.py[m
+[36m@@ -216,12 +216,12 @@[m [mclass BaseVectorStorage(StorageNameSpace, ABC):[m
+ [m
+     @abstractmethod[m
+     async def query([m
+[31m-        self, [m
+[31m-        query: str, [m
+[31m-        top_k: int, [m
+[32m+[m[32m        self,[m
+[32m+[m[32m        query: str,[m
+[32m+[m[32m        top_k: int,[m
+         query_embedding: list[float] = None,[m
+         filterby_ids: list[str] | None = None,[m
+[31m-        filter_type: Literal["chunk", "document"] | None = None[m
+[32m+[m[32m        filter_type: Literal["chunk", "document"] | None = None,[m
+     ) -> list[dict[str, Any]]:[m
+         """Query the vector storage and retrieve top_k results.[m
+ [m
+[36m@@ -572,72 +572,68 @@[m [mclass BaseGraphStorage(StorageNameSpace, ABC):[m
+         return all_edges[m
+ [m
+     async def get_nodes_by_chunk_ids_filtered([m
+[31m-        self,[m
+[31m-        chunk_ids: list[str],[m
+[31m-        allowed_chunk_ids: set[str][m
+[32m+[m[32m        self, chunk_ids: list[str], allowed_chunk_ids: set[str][m
+     ) -> list[dict]:[m
+         """Get nodes associated with chunk_ids, filtered by allowed_chunk_ids.[m
+[31m-        [m
+[32m+[m
+         This method handles merged entities where source_id contains multiple chunk IDs[m
+         separated by GRAPH_FIELD_SEP. A node is included if ANY of its chunk IDs are[m
+         in the allowed_chunk_ids set.[m
+[31m-        [m
+[32m+[m
+         Args:[m
+             chunk_ids: List of chunk IDs from the query[m
+             allowed_chunk_ids: Set of chunk IDs that are allowed (from allowed documents)[m
+[31m-            [m
+[32m+[m
+         Returns:[m
+             List of nodes that match the query AND are from allowed documents[m
+         """[m
+         all_nodes = await self.get_nodes_by_chunk_ids(chunk_ids)[m
+[31m-        [m
+[32m+[m
+         filtered_nodes = [][m
+         for node in all_nodes:[m
+             source_id = node.get("source_id", "")[m
+             if not source_id:[m
+                 continue[m
+[31m-            [m
+[32m+[m
+             # Split source_id by separator to handle merged entities[m
+             node_chunk_ids = set(source_id.split(GRAPH_FIELD_SEP))[m
+[31m-            [m
+[32m+[m
+             # Include if ANY chunk ID matches the query AND is allowed[m
+             if node_chunk_ids & set(chunk_ids) and node_chunk_ids & allowed_chunk_ids:[m
+                 filtered_nodes.append(node)[m
+[31m-        [m
+[32m+[m
+         return filtered_nodes[m
+ [m
+     async def get_edges_by_chunk_ids_filtered([m
+[31m-        self,[m
+[31m-        chunk_ids: list[str],[m
+[31m-        allowed_chunk_ids: set[str][m
+[32m+[m[32m        self, chunk_ids: list[str], allowed_chunk_ids: set[str][m
+     ) -> list[dict]:[m
+         """Get edges associated with chunk_ids, filtered by allowed_chunk_ids.[m
+[31m-        [m
+[32m+[m
+         This method handles merged relationships where source_id contains multiple chunk IDs.[m
+         An edge is included if ANY of its chunk IDs are in the allowed_chunk_ids set.[m
+[31m-        [m
+[32m+[m
+         Args:[m
+             chunk_ids: List of chunk IDs from the query[m
+             allowed_chunk_ids: Set of chunk IDs that are allowed (from allowed documents)[m
+[31m-            [m
+[32m+[m
+         Returns:[m
+             List of edges that match the query AND are from allowed documents[m
+         """[m
+         all_edges = await self.get_edges_by_chunk_ids(chunk_ids)[m
+[31m-        [m
+[32m+[m
+         filtered_edges = [][m
+         for edge in all_edges:[m
+             source_id = edge.get("source_id", "")[m
+             if not source_id:[m
+                 continue[m
+[31m-            [m
+[32m+[m
+             # Split source_id by separator to handle merged relations[m
+             edge_chunk_ids = set(source_id.split(GRAPH_FIELD_SEP))[m
+[31m-            [m
+[32m+[m
+             # Include if ANY chunk ID matches the query AND is allowed[m
+             if edge_chunk_ids & set(chunk_ids) and edge_chunk_ids & allowed_chunk_ids:[m
+                 filtered_edges.append(edge)[m
+[31m-        [m
+[32m+[m
+         return filtered_edges[m
+ [m
+     @abstractmethod[m
+[1mdiff --git a/LightRAG/lightrag/constants.py b/LightRAG/lightrag/constants.py[m
+[1mindex baca0b1..48cfc33 100644[m
+[1m--- a/LightRAG/lightrag/constants.py[m
+[1m+++ b/LightRAG/lightrag/constants.py[m
+[36m@@ -81,7 +81,9 @@[m [mDEFAULT_EMBEDDING_TIMEOUT = 30[m
+ DEFAULT_LOG_MAX_BYTES = 10485760  # Default 10MB[m
+ DEFAULT_LOG_BACKUP_COUNT = 5  # Default 5 backups[m
+ DEFAULT_LOG_FILENAME = "lightrag.log"  # Default log filename[m
+[31m-DEFAULT_LOG_INCLUDE_LOCATION = True  # Default to include filename and function name in logs[m
+[32m+[m[32mDEFAULT_LOG_INCLUDE_LOCATION = ([m
+[32m+[m[32m    True  # Default to include filename and function name in logs[m
+[32m+[m[32m)[m
+ [m
+ # Ollama server configuration defaults[m
+ DEFAULT_OLLAMA_MODEL_NAME = "lightrag"[m
+[1mdiff --git a/LightRAG/lightrag/kg/faiss_impl.py b/LightRAG/lightrag/kg/faiss_impl.py[m
+[1mindex dc9dcad..d3e5ab1 100644[m
+[1m--- a/LightRAG/lightrag/kg/faiss_impl.py[m
+[1m+++ b/LightRAG/lightrag/kg/faiss_impl.py[m
+[36m@@ -180,11 +180,11 @@[m [mclass FaissVectorDBStorage(BaseVectorStorage):[m
+         return [m["__id__"] for m in list_data][m
+ [m
+     async def query([m
+[31m-        self, [m
+[31m-        query: str, [m
+[31m-        top_k: int, [m
+[32m+[m[32m        self,[m
+[32m+[m[32m        query: str,[m
+[32m+[m[32m        top_k: int,[m
+         query_embedding: list[float] = None,[m
+[31m-        filter_doc_ids: list[str] | None = None[m
+[32m+[m[32m        filter_doc_ids: list[str] | None = None,[m
+     ) -> list[dict[str, Any]]:[m
+         """[m
+         Search by a textual query; returns top_k results with their metadata + similarity distance.[m
+[36m@@ -221,13 +221,13 @@[m [mclass FaissVectorDBStorage(BaseVectorStorage):[m
+                 continue[m
+ [m
+             meta = self._id_to_meta.get(idx, {})[m
+[31m-            [m
+[32m+[m
+             # Filter by doc IDs if provided (post-retrieval for in-memory storage)[m
+             if filter_set is not None:[m
+                 full_doc_id = meta.get("full_doc_id")[m
+                 if full_doc_id not in filter_set:[m
+                     continue[m
+[31m-            [m
+[32m+[m
+             # Filter out __vector__ from query results to avoid returning large vector data[m
+             filtered_meta = {k: v for k, v in meta.items() if k != "__vector__"}[m
+             results.append([m
+[1mdiff --git a/LightRAG/lightrag/kg/milvus_impl.py b/LightRAG/lightrag/kg/milvus_impl.py[m
+[1mindex eb15891..714c46e 100644[m
+[1m--- a/LightRAG/lightrag/kg/milvus_impl.py[m
+[1m+++ b/LightRAG/lightrag/kg/milvus_impl.py[m
+[36m@@ -1047,11 +1047,11 @@[m [mclass MilvusVectorDBStorage(BaseVectorStorage):[m
+         return results[m
+ [m
+     async def query([m
+[31m-        self, [m
+[31m-        query: str, [m
+[31m-        top_k: int, [m
+[32m+[m[32m        self,[m
+[32m+[m[32m        query: str,[m
+[32m+[m[32m        top_k: int,[m
+         query_embedding: list[float] = None,[m
+[31m-        filter_doc_ids: list[str] | None = None[m
+[32m+[m[32m        filter_doc_ids: list[str] | None = None,[m
+     ) -> list[dict[str, Any]]:[m
+         # Ensure collection is loaded before querying[m
+         self._ensure_collection_loaded()[m
+[1mdiff --git a/LightRAG/lightrag/kg/mongo_impl.py b/LightRAG/lightrag/kg/mongo_impl.py[m
+[1mindex 41354e9..71e6fe0 100644[m
+[1m--- a/LightRAG/lightrag/kg/mongo_impl.py[m
+[1m+++ b/LightRAG/lightrag/kg/mongo_impl.py[m
+[36m@@ -1818,11 +1818,11 @@[m [mclass MongoVectorDBStorage(BaseVectorStorage):[m
+         return list_data[m
+ [m
+     async def query([m
+[31m-        self, [m
+[31m-        query: str, [m
+[31m-        top_k: int, [m
+[32m+[m[32m        self,[m
+[32m+[m[32m        query: str,[m
+[32m+[m[32m        top_k: int,[m
+         query_embedding: list[float] = None,[m
+[31m-        filter_doc_ids: list[str] | None = None[m
+[32m+[m[32m        filter_doc_ids: list[str] | None = None,[m
+     ) -> list[dict[str, Any]]:[m
+         """Queries the vector database using Atlas Vector Search."""[m
+         if query_embedding is not None:[m
+[36m@@ -1853,11 +1853,11 @@[m [mclass MongoVectorDBStorage(BaseVectorStorage):[m
+             {"$addFields": {"score": {"$meta": "vectorSearchScore"}}},[m
+             {"$match": {"score": {"$gte": self.cosine_better_than_threshold}}},[m
+         ][m
+[31m-        [m
+[32m+[m
+         # Add doc ID filter if provided[m
+         if filter_doc_ids:[m
+             pipeline.append({"$match": {"full_doc_id": {"$in": filter_doc_ids}}})[m
+[31m-        [m
+[32m+[m
+         pipeline.append({"$project": {"vector": 0}})[m
+ [m
+         # Execute the aggregation pipeline[m
+[1mdiff --git a/LightRAG/lightrag/kg/nano_vector_db_impl.py b/LightRAG/lightrag/kg/nano_vector_db_impl.py[m
+[1mindex b0a043e..b1892ec 100644[m
+[1m--- a/LightRAG/lightrag/kg/nano_vector_db_impl.py[m
+[1m+++ b/LightRAG/lightrag/kg/nano_vector_db_impl.py[m
+[36m@@ -137,12 +137,12 @@[m [mclass NanoVectorDBStorage(BaseVectorStorage):[m
+             )[m
+ [m
+     async def query([m
+[31m-        self, [m
+[31m-        query: str, [m
+[31m-        top_k: int, [m
+[32m+[m[32m        self,[m
+[32m+[m[32m        query: str,[m
+[32m+[m[32m        top_k: int,[m
+         query_embedding: list[float] = None,[m
+         filterby_ids: list[str] | None = None,[m
+[31m-        filter_type: Literal["chunk", "document"] | None = None[m
+[32m+[m[32m        filter_type: Literal["chunk", "document"] | None = None,[m
+     ) -> list[dict[str, Any]]:[m
+         # Use provided embedding or compute it[m
+         if query_embedding is not None:[m
+[36m@@ -160,9 +160,13 @@[m [mclass NanoVectorDBStorage(BaseVectorStorage):[m
+         if filterby_ids:[m
+             filter_set = set(filterby_ids)[m
+             if filter_type == "document":[m
+[31m-                filter_lambda = lambda rec: bool(rec.get("full_doc_id") in filter_set)[m
+[32m+[m
+[32m+[m[32m                def filter_lambda(rec):[m
+[32m+[m[32m                    return bool(rec.get("full_doc_id") in filter_set)[m
+             elif filter_type == "chunk":[m
+[31m-                filter_lambda = lambda rec: bool(rec.get("source_id") in filter_set)[m
+[32m+[m
+[32m+[m[32m                def filter_lambda(rec):[m
+[32m+[m[32m                    return bool(rec.get("source_id") in filter_set)[m
+             else:[m
+                 raise ValueError(f"Invalid filter type: {filter_type}")[m
+ [m
+[36m@@ -170,9 +174,9 @@[m [mclass NanoVectorDBStorage(BaseVectorStorage):[m
+             query=embedding,[m
+             top_k=top_k,[m
+             better_than_threshold=self.cosine_better_than_threshold,[m
+[31m-            filter_lambda=filter_lambda[m
+[32m+[m[32m            filter_lambda=filter_lambda,[m
+         )[m
+[31m-        [m
+[32m+[m
+         results = [[m
+             {[m
+                 **{k: v for k, v in dp.items() if k != "vector"},[m
+[1mdiff --git a/LightRAG/lightrag/kg/networkx_impl.py b/LightRAG/lightrag/kg/networkx_impl.py[m
+[1mindex 1976169..2c6e9f0 100644[m
+[1m--- a/LightRAG/lightrag/kg/networkx_impl.py[m
+[1m+++ b/LightRAG/lightrag/kg/networkx_impl.py[m
+[36m@@ -416,9 +416,7 @@[m [mclass NetworkXStorage(BaseGraphStorage):[m
+         return matching_edges[m
+ [m
+     async def get_nodes_by_chunk_ids_filtered([m
+[31m-        self,[m
+[31m-        chunk_ids: list[str],[m
+[31m-        allowed_chunk_ids: set[str][m
+[32m+[m[32m        self, chunk_ids: list[str], allowed_chunk_ids: set[str][m
+     ) -> list[dict]:[m
+         """Optimized filtered node retrieval for NetworkX."""[m
+         chunk_ids_set = set(chunk_ids)[m
+[36m@@ -429,16 +427,16 @@[m [mclass NetworkXStorage(BaseGraphStorage):[m
+             if "source_id" in node_data:[m
+                 node_source_ids = set(node_data["source_id"].split(GRAPH_FIELD_SEP))[m
+                 # Include if ANY matches query AND ANY is allowed[m
+[31m-                if not node_source_ids.isdisjoint(chunk_ids_set) and not node_source_ids.isdisjoint(allowed_chunk_ids_set):[m
+[32m+[m[32m                if not node_source_ids.isdisjoint([m
+[32m+[m[32m                    chunk_ids_set[m
+[32m+[m[32m                ) and not node_source_ids.isdisjoint(allowed_chunk_ids_set):[m
+                     node_data_with_id = node_data.copy()[m
+                     node_data_with_id["id"] = node_id[m
+                     matching_nodes.append(node_data_with_id)[m
+         return matching_nodes[m
+ [m
+     async def get_edges_by_chunk_ids_filtered([m
+[31m-        self,[m
+[31m-        chunk_ids: list[str],[m
+[31m-        allowed_chunk_ids: set[str][m
+[32m+[m[32m        self, chunk_ids: list[str], allowed_chunk_ids: set[str][m
+     ) -> list[dict]:[m
+         """Optimized filtered edge retrieval for NetworkX."""[m
+         chunk_ids_set = set(chunk_ids)[m
+[36m@@ -449,7 +447,9 @@[m [mclass NetworkXStorage(BaseGraphStorage):[m
+             if "source_id" in edge_data:[m
+                 edge_source_ids = set(edge_data["source_id"].split(GRAPH_FIELD_SEP))[m
+                 # Include if ANY matches query AND ANY is allowed[m
+[31m-                if not edge_source_ids.isdisjoint(chunk_ids_set) and not edge_source_ids.isdisjoint(allowed_chunk_ids_set):[m
+[32m+[m[32m                if not edge_source_ids.isdisjoint([m
+[32m+[m[32m                    chunk_ids_set[m
+[32m+[m[32m                ) and not edge_source_ids.isdisjoint(allowed_chunk_ids_set):[m
+                     edge_data_with_nodes = edge_data.copy()[m
+                     edge_data_with_nodes["source"] = u[m
+                     edge_data_with_nodes["target"] = v[m
+[1mdiff --git a/LightRAG/lightrag/kg/postgres_impl.py b/LightRAG/lightrag/kg/postgres_impl.py[m
+[1mindex 0a0a133..67bddf6 100644[m
+[1m--- a/LightRAG/lightrag/kg/postgres_impl.py[m
+[1m+++ b/LightRAG/lightrag/kg/postgres_impl.py[m
+[36m@@ -2004,11 +2004,11 @@[m [mclass PGVectorStorage(BaseVectorStorage):[m
+ [m
+     #################### query method ###############[m
+     async def query([m
+[31m-        self, [m
+[31m-        query: str, [m
+[31m-        top_k: int, [m
+[32m+[m[32m        self,[m
+[32m+[m[32m        query: str,[m
+[32m+[m[32m        top_k: int,[m
+         query_embedding: list[float] = None,[m
+[31m-        filter_doc_ids: list[str] | None = None[m
+[32m+[m[32m        filter_doc_ids: list[str] | None = None,[m
+     ) -> list[dict[str, Any]]:[m
+         if query_embedding is not None:[m
+             embedding = query_embedding[m
+[36m@@ -2021,23 +2021,27 @@[m [mclass PGVectorStorage(BaseVectorStorage):[m
+         embedding_string = ",".join(map(str, embedding))[m
+ [m
+         # Build SQL with optional doc ID filter[m
+[31m-        sql_template = SQL_TEMPLATES[self.namespace].format(embedding_string=embedding_string)[m
+[31m-        [m
+[32m+[m[32m        sql_template = SQL_TEMPLATES[self.namespace].format([m
+[32m+[m[32m            embedding_string=embedding_string[m
+[32m+[m[32m        )[m
+[32m+[m
+         # Add WHERE clause for doc ID filtering if provided[m
+         if filter_doc_ids:[m
+             doc_ids_str = ",".join([f"'{doc_id}'" for doc_id in filter_doc_ids])[m
+             # Insert the filter after WHERE workspace = clause[m
+             sql_template = sql_template.replace([m
+                 "WHERE c.workspace = $1",[m
+[31m-                f"WHERE c.workspace = $1 AND c.full_doc_id IN ({doc_ids_str})"[m
+[32m+[m[32m                f"WHERE c.workspace = $1 AND c.full_doc_id IN ({doc_ids_str})",[m
+             )[m
+[31m-        [m
+[32m+[m
+         params = {[m
+             "workspace": self.workspace,[m
+             "closer_than_threshold": 1 - self.cosine_better_than_threshold,[m
+             "top_k": top_k,[m
+         }[m
+[31m-        results = await self.db.query(sql_template, params=list(params.values()), multirows=True)[m
+[32m+[m[32m        results = await self.db.query([m
+[32m+[m[32m            sql_template, params=list(params.values()), multirows=True[m
+[32m+[m[32m        )[m
+         return results[m
+ [m
+     async def index_done_callback(self) -> None:[m
+[1mdiff --git a/LightRAG/lightrag/kg/qdrant_impl.py b/LightRAG/lightrag/kg/qdrant_impl.py[m
+[1mindex 150b853..5561ffe 100644[m
+[1m--- a/LightRAG/lightrag/kg/qdrant_impl.py[m
+[1m+++ b/LightRAG/lightrag/kg/qdrant_impl.py[m
+[36m@@ -212,11 +212,11 @@[m [mclass QdrantVectorDBStorage(BaseVectorStorage):[m
+         return results[m
+ [m
+     async def query([m
+[31m-        self, [m
+[31m-        query: str, [m
+[31m-        top_k: int, [m
+[32m+[m[32m        self,[m
+[32m+[m[32m        query: str,[m
+[32m+[m[32m        top_k: int,[m
+         query_embedding: list[float] = None,[m
+[31m-        filter_doc_ids: list[str] | None = None[m
+[32m+[m[32m        filter_doc_ids: list[str] | None = None,[m
+     ) -> list[dict[str, Any]]:[m
+         if query_embedding is not None:[m
+             embedding = query_embedding[m
+[36m@@ -228,14 +228,13 @@[m [mclass QdrantVectorDBStorage(BaseVectorStorage):[m
+ [m
+         # Build filter if doc IDs provided[m
+         from qdrant_client import models[m
+[31m-        [m
+[32m+[m
+         query_filter = None[m
+         if filter_doc_ids:[m
+             query_filter = models.Filter([m
+                 must=[[m
+                     models.FieldCondition([m
+[31m-                        key="full_doc_id",[m
+[31m-                        match=models.MatchAny(any=filter_doc_ids)[m
+[32m+[m[32m                        key="full_doc_id", match=models.MatchAny(any=filter_doc_ids)[m
+                     )[m
+                 ][m
+             )[m
+[1mdiff --git a/LightRAG/lightrag/lightrag.py b/LightRAG/lightrag/lightrag.py[m
+[1mindex d1b4114..0ef0c98 100644[m
+[1m--- a/LightRAG/lightrag/lightrag.py[m
+[1m+++ b/LightRAG/lightrag/lightrag.py[m
+[36m@@ -1110,9 +1110,7 @@[m [mclass LightRAG:[m
+         file_paths: str | list[str] | None = None,[m
+         track_id: str | None = None,[m
+         scheme_name: str | None = None,[m
+[31m-        metadata: dict[str, Any][m
+[31m-        | list[dict[str, Any]][m
+[31m-        | None = None,[m
+[32m+[m[32m        metadata: dict[str, Any] | list[dict[str, Any]] | None = None,[m
+     ) -> str:[m
+         """[m
+         Pipeline for Processing Documents[m
+[36m@@ -1883,30 +1881,36 @@[m [mclass LightRAG:[m
+                                 current_doc_status = await self.doc_status.get_by_id([m
+                                     doc_id[m
+                                 )[m
+[31m-                                [m
+[32m+[m
+                                 # Get nodes and edges counts for this document[m
+                                 nodes_count = 0[m
+                                 edges_count = 0[m
+                                 try:[m
+                                     if self.full_entities:[m
+[31m-                                        entities_data = await self.full_entities.get_by_id(doc_id)[m
+[32m+[m[32m                                        entities_data = ([m
+[32m+[m[32m                                            await self.full_entities.get_by_id(doc_id)[m
+[32m+[m[32m                                        )[m
+                                         if entities_data:[m
+                                             nodes_count = entities_data.get("count", 0)[m
+[31m-                                    [m
+[32m+[m
+                                     if self.full_relations:[m
+[31m-                                        relations_data = await self.full_relations.get_by_id(doc_id)[m
+[32m+[m[32m                                        relations_data = ([m
+[32m+[m[32m                                            await self.full_relations.get_by_id(doc_id)[m
+[32m+[m[32m                                        )[m
+                                         if relations_data:[m
+                                             edges_count = relations_data.get("count", 0)[m
+                                 except Exception as e:[m
+[31m-                                    logger.warning(f"Could not retrieve graph counts for {doc_id}: {e}")[m
+[31m-                                [m
+[32m+[m[32m                                    logger.warning([m
+[32m+[m[32m                                        f"Could not retrieve graph counts for {doc_id}: {e}"[m
+[32m+[m[32m                                    )[m
+[32m+[m
+                                 # Update metadata with graph counts[m
+                                 updated_metadata = {[m
+                                     **(current_doc_status.get("metadata") or {}),[m
+                                     "nodes_count": nodes_count,[m
+                                     "edges_count": edges_count,[m
+                                 }[m
+[31m-                                [m
+[32m+[m
+                                 await self.doc_status.upsert([m
+                                     {[m
+                                         doc_id: {[m
+[1mdiff --git a/LightRAG/lightrag/operate.py b/LightRAG/lightrag/operate.py[m
+[1mindex 957ead6..22c64ad 100644[m
+[1m--- a/LightRAG/lightrag/operate.py[m
+[1m+++ b/LightRAG/lightrag/operate.py[m
+[36m@@ -61,52 +61,51 @@[m [mload_dotenv(dotenv_path=".env", override=False)[m
+ [m
+ [m
+ async def _get_chunk_ids_for_doc_ids([m
+[31m-    text_chunks_db: BaseKVStorage,[m
+[31m-    doc_ids: list[str][m
+[32m+[m[32m    text_chunks_db: BaseKVStorage, doc_ids: list[str][m
+ ) -> set[str]:[m
+     """[m
+     Get all chunk IDs that belong to the specified document IDs.[m
+[31m-    [m
+[32m+[m
+     This function scans the text chunks storage and collects chunk IDs[m
+     where full_doc_id matches any of the provided doc_ids. This mapping[m
+     is used to filter entities and relationships during query execution,[m
+     since they store chunk IDs (not doc IDs) in their source_id fields.[m
+[31m-    [m
+[32m+[m
+     Args:[m
+         text_chunks_db: Text chunks storage (BaseKVStorage)[m
+         doc_ids: List of document IDs to filter by (e.g., ["doc-abc123", "doc-xyz789"])[m
+[31m-        [m
+[32m+[m
+     Returns:[m
+         Set of chunk IDs belonging to the documents (e.g., {"chunk-123", "chunk-456"})[m
+[31m-        [m
+[32m+[m
+     Note:[m
+         This performs an O(n) scan of all chunks. For large datasets, consider[m
+         caching the doc_id → chunk_ids mapping if performance becomes an issue.[m
+     """[m
+     if not doc_ids:[m
+         return set()[m
+[31m-    [m
+[32m+[m
+     doc_ids_set = set(doc_ids)[m
+     allowed_chunk_ids = set()[m
+[31m-    [m
+[32m+[m
+     try:[m
+         # Get all data from text_chunks_db[m
+         # Different storage types may have different methods to iterate[m
+         # For now, we'll use a generic approach that works with most KV stores[m
+[31m-        [m
+[32m+[m
+         # Most KV storage implementations store data in memory and can be accessed[m
+         # We need to iterate through all chunks and check their full_doc_id[m
+[31m-        storage_data = getattr(text_chunks_db, '_data', None)[m
+[31m-        [m
+[32m+[m[32m        storage_data = getattr(text_chunks_db, "_data", None)[m
+[32m+[m
+         if storage_data is not None:[m
+             # In-memory storage (JSON-based)[m
+             for chunk_id, chunk_data in storage_data.items():[m
+                 if isinstance(chunk_data, dict):[m
+[31m-                    full_doc_id = chunk_data.get('full_doc_id')[m
+[32m+[m[32m                    full_doc_id = chunk_data.get("full_doc_id")[m
+                     if full_doc_id in doc_ids_set:[m
+                         # Extract the actual chunk ID[m
+                         # The key might be the chunk ID or we need to get it from _id field[m
+[31m-                        actual_chunk_id = chunk_data.get('_id', chunk_id)[m
+[32m+[m[32m                        actual_chunk_id = chunk_data.get("_id", chunk_id)[m
+                         allowed_chunk_ids.add(actual_chunk_id)[m
+         else:[m
+             # For database-backed storage, we may need a different approach[m
+[36m@@ -115,13 +114,13 @@[m [masync def _get_chunk_ids_for_doc_ids([m
+                 "Could not access text_chunks_db data directly. "[m
+                 "Doc ID filtering may not work correctly for this storage type."[m
+             )[m
+[31m-    [m
+[32m+[m
+     except Exception as e:[m
+         logger.error(f"Error getting chunk IDs for doc IDs: {e}")[m
+         # Return empty set on error - this will effectively filter out everything[m
+         # which is safer than allowing all[m
+         return set()[m
+[31m-    [m
+[32m+[m
+     logger.debug(f"Mapped {len(doc_ids)} doc IDs to {len(allowed_chunk_ids)} chunk IDs")[m
+     return allowed_chunk_ids[m
+ [m
+[36m@@ -2715,11 +2714,11 @@[m [masync def _get_vector_context([m
+ [m
+         # Pass filterby_ids to enable document-level filtering[m
+         results = await chunks_vdb.query([m
+[31m-            query, [m
+[31m-            top_k=search_top_k, [m
+[32m+[m[32m            query,[m
+[32m+[m[32m            top_k=search_top_k,[m
+             query_embedding=query_embedding,[m
+             filterby_ids=query_param.ids,  # Pass doc IDs for filtering[m
+[31m-            filter_type="document"[m
+[32m+[m[32m            filter_type="document",[m
+         )[m
+         if not results:[m
+             logger.info([m
+[36m@@ -2799,14 +2798,14 @@[m [masync def _perform_kg_search([m
+     # Handle local and global modes[m
+     filter_chunk_ids = None[m
+     filter_chunk_ids = await _get_chunk_ids_for_doc_ids(text_chunks_db, query_param.ids)[m
+[31m-    [m
+[32m+[m
+     if query_param.mode == "local" and len(ll_keywords) > 0:[m
+         local_entities, local_relations = await _get_node_data([m
+             ll_keywords,[m
+             knowledge_graph_inst,[m
+             entities_vdb,[m
+             query_param,[m
+[31m-            filter_chunk_ids[m
+[32m+[m[32m            filter_chunk_ids,[m
+         )[m
+ [m
+     elif query_param.mode == "global" and len(hl_keywords) > 0:[m
+[36m@@ -2815,7 +2814,7 @@[m [masync def _perform_kg_search([m
+             knowledge_graph_inst,[m
+             relationships_vdb,[m
+             query_param,[m
+[31m-            filter_chunk_ids[m
+[32m+[m[32m            filter_chunk_ids,[m
+         )[m
+ [m
+     else:  # hybrid or mix mode[m
+[36m@@ -2825,7 +2824,7 @@[m [masync def _perform_kg_search([m
+                 knowledge_graph_inst,[m
+                 entities_vdb,[m
+                 query_param,[m
+[31m-                filter_chunk_ids[m
+[32m+[m[32m                filter_chunk_ids,[m
+             )[m
+         if len(hl_keywords) > 0:[m
+             global_relations, global_entities = await _get_edge_data([m
+[36m@@ -2833,7 +2832,7 @@[m [masync def _perform_kg_search([m
+                 knowledge_graph_inst,[m
+                 relationships_vdb,[m
+                 query_param,[m
+[31m-                filter_chunk_ids[m
+[32m+[m[32m                filter_chunk_ids,[m
+             )[m
+ [m
+         # Get vector chunks for mix mode[m
+[36m@@ -3593,14 +3592,19 @@[m [masync def _get_node_data([m
+     knowledge_graph_inst: BaseGraphStorage,[m
+     entities_vdb: BaseVectorStorage,[m
+     query_param: QueryParam,[m
+[31m-    filter_chunk_ids: list[str]|None = None[m
+[32m+[m[32m    filter_chunk_ids: list[str] | None = None,[m
+ ):[m
+     # get similar entities[m
+     logger.info([m
+         f"Query nodes: {query} (top_k:{query_param.top_k}, cosine:{entities_vdb.cosine_better_than_threshold})"[m
+     )[m
+ [m
+[31m-    results = await entities_vdb.query(query, top_k=query_param.top_k, filterby_ids=filter_chunk_ids, filter_type="chunk")[m
+[32m+[m[32m    results = await entities_vdb.query([m
+[32m+[m[32m        query,[m
+[32m+[m[32m        top_k=query_param.top_k,[m
+[32m+[m[32m        filterby_ids=filter_chunk_ids,[m
+[32m+[m[32m        filter_type="chunk",[m
+[32m+[m[32m    )[m
+ [m
+     if not len(results):[m
+         return [], [][m
+[36m@@ -3871,13 +3875,18 @@[m [masync def _get_edge_data([m
+     knowledge_graph_inst: BaseGraphStorage,[m
+     relationships_vdb: BaseVectorStorage,[m
+     query_param: QueryParam,[m
+[31m-    filter_chunk_ids: list[str]|None = None[m
+[32m+[m[32m    filter_chunk_ids: list[str] | None = None,[m
+ ):[m
+     logger.info([m
+         f"Query edges: {keywords} (top_k:{query_param.top_k}, cosine:{relationships_vdb.cosine_better_than_threshold})"[m
+     )[m
+ [m
+[31m-    results = await relationships_vdb.query(keywords, top_k=query_param.top_k, filterby_ids=filter_chunk_ids, filter_type="chunk")[m
+[32m+[m[32m    results = await relationships_vdb.query([m
+[32m+[m[32m        keywords,[m
+[32m+[m[32m        top_k=query_param.top_k,[m
+[32m+[m[32m        filterby_ids=filter_chunk_ids,[m
+[32m+[m[32m        filter_type="chunk",[m
+[32m+[m[32m    )[m
+ [m
+     if not len(results):[m
+         return [], [][m
+[1mdiff --git a/LightRAG/lightrag/utils.py b/LightRAG/lightrag/utils.py[m
+[1mindex 3e2d569..1aa8647 100644[m
+[1m--- a/LightRAG/lightrag/utils.py[m
+[1m+++ b/LightRAG/lightrag/utils.py[m
+[36m@@ -68,7 +68,7 @@[m [mdef get_env_value([m
+             else:[m
+                 # We can't use logger here yet, so just return default[m
+                 return default[m
+[31m-        except (json.JSONDecodeError, ValueError) as e:[m
+[32m+[m[32m        except (json.JSONDecodeError, ValueError):[m
+             # We can't use logger here yet, so just return default[m
+             return default[m
+ [m
+[36m@@ -80,17 +80,19 @@[m [mdef get_env_value([m
+ [m
+ def get_log_format(include_location: bool = None) -> str:[m
+     """Get the appropriate log format based on configuration.[m
+[31m-    [m
+[32m+[m
+     Args:[m
+         include_location: Whether to include filename and function name in logs.[m
+                          If None, reads from environment variable LOG_INCLUDE_LOCATION.[m
+[31m-    [m
+[32m+[m
+     Returns:[m
+         str: The log format string to use.[m
+     """[m
+     if include_location is None:[m
+[31m-        include_location = get_env_value("LOG_INCLUDE_LOCATION", DEFAULT_LOG_INCLUDE_LOCATION, bool)[m
+[31m-    [m
+[32m+[m[32m        include_location = get_env_value([m
+[32m+[m[32m            "LOG_INCLUDE_LOCATION", DEFAULT_LOG_INCLUDE_LOCATION, bool[m
+[32m+[m[32m        )[m
+[32m+[m
+     if include_location:[m
+         return "%(levelname)s - %(filename)s:%(funcName)s:%(lineno)d - %(message)s"[m
+     else:[m
+[36m@@ -99,17 +101,19 @@[m [mdef get_log_format(include_location: bool = None) -> str:[m
+ [m
+ def get_detailed_log_format(include_location: bool = None) -> str:[m
+     """Get the detailed log format (with timestamp) based on configuration.[m
+[31m-    [m
+[32m+[m
+     Args:[m
+         include_location: Whether to include filename and function name in logs.[m
+                          If None, reads from environment variable LOG_INCLUDE_LOCATION.[m
+[31m-    [m
+[32m+[m
+     Returns:[m
+         str: The detailed log format string to use.[m
+     """[m
+     if include_location is None:[m
+[31m-        include_location = get_env_value("LOG_INCLUDE_LOCATION", DEFAULT_LOG_INCLUDE_LOCATION, bool)[m
+[31m-    [m
+[32m+[m[32m        include_location = get_env_value([m
+[32m+[m[32m            "LOG_INCLUDE_LOCATION", DEFAULT_LOG_INCLUDE_LOCATION, bool[m
+[32m+[m[32m        )[m
+[32m+[m
+     if include_location:[m
+         return "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(funcName)s:%(lineno)d - %(message)s"[m
+     else:[m
+[1mdiff --git a/LightRAG/lightrag_webui/src/api/lightrag.ts b/LightRAG/lightrag_webui/src/api/lightrag.ts[m
+[1mindex 2086d3f..3726382 100644[m
+[1m--- a/LightRAG/lightrag_webui/src/api/lightrag.ts[m
+[1m+++ b/LightRAG/lightrag_webui/src/api/lightrag.ts[m
+[36m@@ -416,10 +416,10 @@[m [mexport const queryGraphs = async ([m
+ [m
+ /**[m
+  * Get list of accessible document filenames[m
+[31m- * [m
+[32m+[m[32m *[m
+  * Returns a list of filenames that the current user has access to view,[m
+  * based on their authentication status and access control rules.[m
+[31m- * [m
+[32m+[m[32m *[m
+  * @param filters Optional metadata filters to narrow down the list[m
+  * @returns Array of accessible filenames[m
+  */[m
+[36m@@ -444,10 +444,10 @@[m [mexport const getDocumentsList = async (filters?: AccessFilterPayload): Promise<s[m
+ [m
+ /**[m
+  * Get list of unique project IDs from accessible documents[m
+[31m- * [m
+[32m+[m[32m *[m
+  * Returns a list of unique project_id values from documents that the[m
+  * current user has access to view. Useful for populating project filter dropdowns.[m
+[31m- * [m
+[32m+[m[32m *[m
+  * @param filters Optional metadata filters (owner, tags) to narrow down the list[m
+  * @returns Array of unique project IDs[m
+  */[m
+[1mdiff --git a/LightRAG/lightrag_webui/src/components/documents/MetadataDialog.tsx b/LightRAG/lightrag_webui/src/components/documents/MetadataDialog.tsx[m
+[1mindex 1e41a3e..b9363ab 100644[m
+[1m--- a/LightRAG/lightrag_webui/src/components/documents/MetadataDialog.tsx[m
+[1m+++ b/LightRAG/lightrag_webui/src/components/documents/MetadataDialog.tsx[m
+[36m@@ -15,7 +15,7 @@[m [minterface MetadataDialogProps {[m
+ const formatMetadataValue = (value: any, key?: string): string => {[m
+   if (value === null || value === undefined) return '-'[m
+   if (typeof value === 'boolean') return value ? 'Yes' : 'No'[m
+[31m-  [m
+[32m+[m
+   // Format timestamp fields[m
+   if (key && (key.includes('time') || key.includes('timestamp') || key.includes('_at'))) {[m
+     try {[m
+[36m@@ -40,7 +40,7 @@[m [mconst formatMetadataValue = (value: any, key?: string): string => {[m
+           // Too small to be a valid timestamp, return as-is[m
+           return String(value)[m
+         }[m
+[31m-        [m
+[32m+[m
+         if (!isNaN(date.getTime())) {[m
+           return date.toLocaleString()[m
+         }[m
+[36m@@ -49,7 +49,7 @@[m [mconst formatMetadataValue = (value: any, key?: string): string => {[m
+       // Fall through to default handling[m
+     }[m
+   }[m
+[31m-  [m
+[32m+[m
+   if (Array.isArray(value)) {[m
+     if (value.length === 0) return '-'[m
+     return JSON.stringify(value, null, 2)[m
+[36m@@ -136,4 +136,3 @@[m [mconst MetadataDialog: React.FC<MetadataDialogProps> = ({[m
+ }[m
+ [m
+ export default MetadataDialog[m
+[31m-[m
+[1mdiff --git a/LightRAG/lightrag_webui/src/components/documents/SimpleFileUploader.tsx b/LightRAG/lightrag_webui/src/components/documents/SimpleFileUploader.tsx[m
+[1mindex 6621452..3cd31ea 100644[m
+[1m--- a/LightRAG/lightrag_webui/src/components/documents/SimpleFileUploader.tsx[m
+[1m+++ b/LightRAG/lightrag_webui/src/components/documents/SimpleFileUploader.tsx[m
+[36m@@ -52,9 +52,9 @@[m [mexport default function SimpleFileUploader({[m
+   const handleFileSelect = useCallback((files: File[]) => {[m
+     console.log('SimpleFileUploader: Files selected:', files.length)[m
+     setError(null)[m
+[31m-    [m
+[32m+[m
+     const newFiles: FileWithStatus[] = [][m
+[31m-    [m
+[32m+[m
+     for (const file of files) {[m
+       const validationError = validateFile(file)[m
+       if (validationError) {[m
+[36m@@ -139,7 +139,7 @@[m [mexport default function SimpleFileUploader({[m
+         console.log(`SimpleFileUploader: Uploading file ${i + 1}/${filesToUpload.length}:`, fileWithStatus.file.name)[m
+         await onUpload(fileWithStatus.file, {})[m
+         console.log('SimpleFileUploader: Upload successful for', fileWithStatus.file.name)[m
+[31m-        [m
+[32m+[m
+         // Update status to success[m
+         setSelectedFiles(prev => {[m
+           const updated = [...prev][m
+[36m@@ -149,7 +149,7 @@[m [mexport default function SimpleFileUploader({[m
+       } catch (err) {[m
+         console.error('SimpleFileUploader: Upload failed for', fileWithStatus.file.name, err)[m
+         const errorMessage = err instanceof Error ? err.message : 'Upload failed'[m
+[31m-        [m
+[32m+[m
+         // Update status to error[m
+         setSelectedFiles(prev => {[m
+           const updated = [...prev][m
+[36m@@ -227,13 +227,13 @@[m [mexport default function SimpleFileUploader({[m
+           disabled={disabled || uploading}[m
+           multiple={multiple}[m
+         />[m
+[31m-        [m
+[32m+[m
+         <div className="flex flex-col items-center gap-2">[m
+           <Upload className="h-8 w-8 text-muted-foreground" />[m
+           <div>[m
+             <p className="text-sm font-medium">[m
+[31m-              {dragActive [m
+[31m-                ? `Drop file${multiple ? 's' : ''} here` [m
+[32m+[m[32m              {dragActive[m
+[32m+[m[32m                ? `Drop file${multiple ? 's' : ''} here`[m
+                 : `Click to upload or drag and drop${multiple ? ' (multiple files supported)' : ''}`}[m
+             </p>[m
+             <p className="text-xs text-muted-foreground">[m
+[36m@@ -325,8 +325,8 @@[m [mexport default function SimpleFileUploader({[m
+           disabled={disabled || uploading}[m
+           className="w-full"[m
+         >[m
+[31m-          {uploading [m
+[31m-            ? `Uploading ${uploadingCount} of ${pendingCount} file${pendingCount > 1 ? 's' : ''}...` [m
+[32m+[m[32m          {uploading[m
+[32m+[m[32m            ? `Uploading ${uploadingCount} of ${pendingCount} file${pendingCount > 1 ? 's' : ''}...`[m
+             : `Upload ${pendingCount} File${pendingCount > 1 ? 's' : ''}`}[m
+         </Button>[m
+       )}[m
+[1mdiff --git a/LightRAG/lightrag_webui/src/components/documents/SimpleUploadDialog.tsx b/LightRAG/lightrag_webui/src/components/documents/SimpleUploadDialog.tsx[m
+[1mindex d7c43a7..44c80d1 100644[m
+[1m--- a/LightRAG/lightrag_webui/src/components/documents/SimpleUploadDialog.tsx[m
+[1m+++ b/LightRAG/lightrag_webui/src/components/documents/SimpleUploadDialog.tsx[m
+[36m@@ -50,15 +50,15 @@[m [mexport default function SimpleUploadDialog({ onDocumentsUploaded }: SimpleUpload[m
+ [m
+     try {[m
+       const result = await uploadDocument(file, selectedScheme.id, undefined, metadata)[m
+[31m-      [m
+[32m+[m
+       if (result.status === 'success') {[m
+         toast.success(t('documentPanel.uploadDocuments.batch.success'))[m
+[31m-        [m
+[32m+[m
+         // Refresh document list[m
+         if (onDocumentsUploaded) {[m
+           await onDocumentsUploaded()[m
+         }[m
+[31m-        [m
+[32m+[m
+         // Close dialog and reset form[m
+         setOpen(false)[m
+         setMetadata({[m
+[36m@@ -103,7 +103,7 @@[m [mexport default function SimpleUploadDialog({ onDocumentsUploaded }: SimpleUpload[m
+           <UploadIcon /> {t('documentPanel.uploadDocuments.button')}[m
+         </Button>[m
+       </DialogTrigger>[m
+[31m-      [m
+[32m+[m
+       <DialogContent className="sm:max-w-2xl" onCloseAutoFocus={(e) => e.preventDefault()}>[m
+         <DialogHeader>[m
+           <DialogTitle>{t('documentPanel.uploadDocuments.title')}</DialogTitle>[m
+[36m@@ -115,7 +115,7 @@[m [mexport default function SimpleUploadDialog({ onDocumentsUploaded }: SimpleUpload[m
+             )}[m
+           </DialogDescription>[m
+         </DialogHeader>[m
+[31m-        [m
+[32m+[m
+         <div className="space-y-6">[m
+           {/* Metadata Form */}[m
+           <div>[m
+[36m@@ -125,7 +125,7 @@[m [mexport default function SimpleUploadDialog({ onDocumentsUploaded }: SimpleUpload[m
+               onChange={handleMetadataChange}[m
+             />[m
+           </div>[m
+[31m-          [m
+[32m+[m
+           {/* File Upload */}[m
+           <div>[m
+             <h3 className="text-sm font-medium mb-3">{t('documentPanel.uploadDocuments.files.title')}</h3>[m
+[36m@@ -138,7 +138,7 @@[m [mexport default function SimpleUploadDialog({ onDocumentsUploaded }: SimpleUpload[m
+                   </p>[m
+                 </div>[m
+                 <p className="text-sm text-yellow-700 mt-1">[m
+[31m-                  Please select a processing scheme (LightRAG or RAGAnything) before uploading files. [m
+[32m+[m[32m                  Please select a processing scheme (LightRAG or RAGAnything) before uploading files.[m
+                   Look for the scheme manager button near the upload button.[m
+                 </p>[m
+               </div>[m
+[1mdiff --git a/LightRAG/lightrag_webui/src/components/documents/UploadMetadataForm.tsx b/LightRAG/lightrag_webui/src/components/documents/UploadMetadataForm.tsx[m
+[1mindex bd0f998..ce17abc 100644[m
+[1m--- a/LightRAG/lightrag_webui/src/components/documents/UploadMetadataForm.tsx[m
+[1m+++ b/LightRAG/lightrag_webui/src/components/documents/UploadMetadataForm.tsx[m
+[36m@@ -40,10 +40,10 @@[m [minterface UploadMetadataFormProps {[m
+   className?: string[m
+ }[m
+ [m
+[31m-export default function UploadMetadataForm({ [m
+[31m-  metadata, [m
+[31m-  onChange, [m
+[31m-  className [m
+[32m+[m[32mexport default function UploadMetadataForm({[m
+[32m+[m[32m  metadata,[m
+[32m+[m[32m  onChange,[m
+[32m+[m[32m  className[m
+ }: UploadMetadataFormProps) {[m
+   const { t } = useTranslation()[m
+   const [newTag, setNewTag] = useState<TagFormValue>({ name: '', value: '' })[m
+[1mdiff --git a/LightRAG/lightrag_webui/src/components/graph/GraphFilterPanel.tsx b/LightRAG/lightrag_webui/src/components/graph/GraphFilterPanel.tsx[m
+[1mindex 5a0129c..cb1656b 100644[m
+[1m--- a/LightRAG/lightrag_webui/src/components/graph/GraphFilterPanel.tsx[m
+[1m+++ b/LightRAG/lightrag_webui/src/components/graph/GraphFilterPanel.tsx[m
+[36m@@ -32,7 +32,7 @@[m [mconst GraphFilterPanel: React.FC<GraphFilterPanelProps> = ({ className = '', dis[m
+   const [isPublicFilter, setIsPublicFilter] = useState<boolean | null>(null)[m
+   const [tags, setTags] = useState<MetadataTag[]>([])[m
+   const [tagDraft, setTagDraft] = useState<MetadataTag>({ name: '', value: '' })[m
+[31m-  [m
+[32m+[m
+   // UI state[m
+   const [isExpanded, setIsExpanded] = useState(false)[m
+   const [availableFiles, setAvailableFiles] = useState<string[]>([])[m
+[36m@@ -127,7 +127,7 @@[m [mconst GraphFilterPanel: React.FC<GraphFilterPanelProps> = ({ className = '', dis[m
+       filename: selectedFilename || '(none)',[m
+       tags: tags.length > 0 ? tags : '(none)'[m
+     })[m
+[31m-    [m
+[32m+[m
+     setGraphFilePathFilter(selectedFilename || null)[m
+     updateGraphMetadataFilters({[m
+       project_id: trimmedProjectId,  // Pass empty string, not undefined[m
+[36m@@ -144,21 +144,21 @@[m [mconst GraphFilterPanel: React.FC<GraphFilterPanelProps> = ({ className = '', dis[m
+     setIsPublicFilter(null)[m
+     setTags([])[m
+     setTagDraft({ name: '', value: '' })[m
+[31m-    [m
+[32m+[m
+     // Clear store state - must pass empty string, not undefined[m
+     // because updateGraphMetadataFilters only updates when value !== undefined[m
+     setGraphFilePathFilter(null)[m
+[31m-    updateGraphMetadataFilters({ [m
+[32m+[m[32m    updateGraphMetadataFilters({[m
+       project_id: '',  // Empty string, not undefined[m
+       owner: '',       // Empty string, not undefined[m
+[31m-      tags: [] [m
+[32m+[m[32m      tags: [][m
+     })[m
+[31m-    [m
+[32m+[m
+     // Close the panel[m
+     setIsExpanded(false)[m
+   }[m
+ [m
+[31m-  const activeFilterCount = [m
+[32m+[m[32m  const activeFilterCount =[m
+     (graphMetadataFilters.project_id && graphMetadataFilters.project_id.trim() ? 1 : 0) +[m
+     (graphFilePathFilter ? 1 : 0) +[m
+     (isPublicFilter !== null ? 1 : 0) +[m
+[36m@@ -269,7 +269,7 @@[m [mconst GraphFilterPanel: React.FC<GraphFilterPanelProps> = ({ className = '', dis[m
+                 <Label className="text-xs font-medium">Visibility</Label>[m
+                 <Select[m
+                   value={isPublicFilter === null ? 'all' : isPublicFilter ? 'public' : 'private'}[m
+[31m-                  onValueChange={(value) => [m
+[32m+[m[32m                  onValueChange={(value) =>[m
+                     setIsPublicFilter(value === 'all' ? null : value === 'public')[m
+                   }[m
+                 >[m
+[36m@@ -360,4 +360,3 @@[m [mconst GraphFilterPanel: React.FC<GraphFilterPanelProps> = ({ className = '', dis[m
+ }[m
+ [m
+ export default GraphFilterPanel[m
+[31m-[m
+[1mdiff --git a/LightRAG/lightrag_webui/src/components/graph/RefreshButton.tsx b/LightRAG/lightrag_webui/src/components/graph/RefreshButton.tsx[m
+[1mindex 879b193..72a6282 100644[m
+[1m--- a/LightRAG/lightrag_webui/src/components/graph/RefreshButton.tsx[m
+[1m+++ b/LightRAG/lightrag_webui/src/components/graph/RefreshButton.tsx[m
+[36m@@ -45,4 +45,3 @@[m [mconst RefreshButton = () => {[m
+ }[m
+ [m
+ export default RefreshButton[m
+[31m-[m
+[1mdiff --git a/LightRAG/lightrag_webui/src/components/ui/Label.tsx b/LightRAG/lightrag_webui/src/components/ui/Label.tsx[m
+[1mindex 97c5f03..1c7e25f 100644[m
+[1m--- a/LightRAG/lightrag_webui/src/components/ui/Label.tsx[m
+[1m+++ b/LightRAG/lightrag_webui/src/components/ui/Label.tsx[m
+[36m@@ -19,5 +19,3 @@[m [mconst Label = React.forwardRef<[m
+ Label.displayName = 'Label'[m
+ [m
+ export default Label[m
+[31m-[m
+[31m-[m
+[1mdiff --git a/LightRAG/lightrag_webui/src/features/GraphViewer.tsx b/LightRAG/lightrag_webui/src/features/GraphViewer.tsx[m
+[1mindex 99c3ced..d5a6841 100644[m
+[1m--- a/LightRAG/lightrag_webui/src/features/GraphViewer.tsx[m
+[1m+++ b/LightRAG/lightrag_webui/src/features/GraphViewer.tsx[m
+[36m@@ -191,7 +191,7 @@[m [mconst GraphViewer = () => {[m
+         <div className="absolute top-2 left-2 flex items-start gap-2">[m
+           {/* Doc Filter */}[m
+           <GraphFilterPanel />[m
+[31m-          [m
+[32m+[m
+           {/* Graph Filter Group */}[m
+           <div className="rounded-lg border-2 border-border bg-background/80 backdrop-blur-sm p-2 flex flex-row flex-wrap items-center gap-2">[m
+             <div className="text-xs font-medium text-muted-foreground">[m
+[36m@@ -206,7 +206,7 @@[m [mconst GraphViewer = () => {[m
+               />[m
+             )}[m
+           </div>[m
+[31m-          [m
+[32m+[m
+           {/* Refresh Button */}[m
+           <RefreshButton />[m
+         </div>[m
+[1mdiff --git a/LightRAG/lightrag_webui/src/features/RetrievalTesting.tsx b/LightRAG/lightrag_webui/src/features/RetrievalTesting.tsx[m
+[1mindex 1cefa9e..51e79fb 100644[m
+[1m--- a/LightRAG/lightrag_webui/src/features/RetrievalTesting.tsx[m
+[1m+++ b/LightRAG/lightrag_webui/src/features/RetrievalTesting.tsx[m
+[36m@@ -272,7 +272,7 @@[m [mexport default function RetrievalTesting() {[m
+       // Always read filters fresh from store to avoid stale closures[m
+       const graphFilters = state.graphMetadataFilters[m
+       const graphFileFilter = state.graphFilePathFilter[m
+[31m-      [m
+[32m+[m
+       // Always send access_filters to ensure consistent filtering[m
+       // The backend will handle undefined/empty values appropriately[m
+       queryParams.access_filters = {[m
+[1mdiff --git a/LightRAG/lightrag_webui/src/index.css b/LightRAG/lightrag_webui/src/index.css[m
+[1mindex 2261269..09ae594 100644[m
+[1m--- a/LightRAG/lightrag_webui/src/index.css[m
+[1m+++ b/LightRAG/lightrag_webui/src/index.css[m
+[36m@@ -139,7 +139,7 @@[m
+   * {[m
+     @apply border-border outline-ring/50;[m
+   }[m
+[31m-  [m
+[32m+[m
+   html, body {[m
+     @apply bg-background text-foreground;[m
+     margin: 0;[m
+[36m@@ -148,7 +148,7 @@[m
+     height: 100%;[m
+     width: 100%;[m
+   }[m
+[31m-  [m
+[32m+[m
+   #root {[m
+     height: 100%;[m
+     width: 100%;[m
+[1mdiff --git a/LightRAG/tests/.github-workflow-example.yml b/LightRAG/tests/.github-workflow-example.yml[m
+[1mindex 8623b03..da6b65b 100644[m
+[1m--- a/LightRAG/tests/.github-workflow-example.yml[m
+[1m+++ b/LightRAG/tests/.github-workflow-example.yml[m
+[36m@@ -12,20 +12,20 @@[m [mon:[m
+ jobs:[m
+   test:[m
+     runs-on: ubuntu-latest[m
+[31m-    [m
+[32m+[m
+     strategy:[m
+       matrix:[m
+         python-version: ["3.10", "3.11", "3.12"][m
+[31m-    [m
+[32m+[m
+     steps:[m
+     - name: Checkout code[m
+       uses: actions/checkout@v3[m
+[31m-    [m
+[32m+[m
+     - name: Set up Python ${{ matrix.python-version }}[m
+       uses: actions/setup-python@v4[m
+       with:[m
+         python-version: ${{ matrix.python-version }}[m
+[31m-    [m
+[32m+[m
+     - name: Cache pip packages[m
+       uses: actions/cache@v3[m
+       with:[m
+[36m@@ -33,17 +33,17 @@[m [mjobs:[m
+         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}[m
+         restore-keys: |[m
+           ${{ runner.os }}-pip-[m
+[31m-    [m
+[32m+[m
+     - name: Install dependencies[m
+       run: |[m
+         python -m pip install --upgrade pip[m
+         pip install -e ".[api]"[m
+         pip install -r tests/requirements-test.txt[m
+[31m-    [m
+[32m+[m
+     - name: Run tests[m
+       run: |[m
+         pytest tests/test_query_routes.py -v --cov=lightrag.api.routers.query_routes --cov-report=xml --cov-report=term[m
+[31m-    [m
+[32m+[m
+     - name: Upload coverage to Codecov[m
+       uses: codecov/codecov-action@v3[m
+       with:[m
+[36m@@ -51,7 +51,7 @@[m [mjobs:[m
+         flags: unittests[m
+         name: codecov-umbrella[m
+         fail_ci_if_error: false[m
+[31m-    [m
+[32m+[m
+     - name: Generate coverage report[m
+       if: always()[m
+       run: |[m
+[1mdiff --git a/LightRAG/tests/requirements-test.txt b/LightRAG/tests/requirements-test.txt[m
+[1mindex 11013b2..a8dfdbc 100644[m
+[1m--- a/LightRAG/tests/requirements-test.txt[m
+[1m+++ b/LightRAG/tests/requirements-test.txt[m
+[36m@@ -1,22 +1,22 @@[m
+ # Testing dependencies for LightRAG[m
+ [m
+[31m-# Core testing framework[m
+[31m-pytest>=7.4.0[m
+[31m-pytest-asyncio>=0.21.0[m
+[31m-pytest-cov>=4.1.0[m
+[31m-[m
+[31m-# HTTP testing[m
+[31m-httpx>=0.24.0[m
+ [m
+ # Mocking (included in Python stdlib, but listed for clarity)[m
+ # unittest.mock - built-in[m
+ [m
+ # FastAPI testing dependencies[m
+ fastapi>=0.100.0[m
+[31m-pydantic>=2.0.0[m
+ [m
+[31m-# Optional: for parallel test execution[m
+[31m-pytest-xdist>=3.3.0[m
+[32m+[m[32m# HTTP testing[m
+[32m+[m[32mhttpx>=0.24.0[m
+[32m+[m[32mpydantic>=2.0.0[m
+[32m+[m[32m# Core testing framework[m
+[32m+[m[32mpytest>=7.4.0[m
+[32m+[m[32mpytest-asyncio>=0.21.0[m
+[32m+[m[32mpytest-cov>=4.1.0[m
+ [m
+ # Optional: for better test output[m
+ pytest-sugar>=0.9.7[m
+[32m+[m
+[32m+[m[32m# Optional: for parallel test execution[m
+[32m+[m[32mpytest-xdist>=3.3.0[m
+[1mdiff --git a/User_Access_Control_Implementation_Guide.md b/User_Access_Control_Implementation_Guide.md[m
+[1mindex 70cbe57..8b2c095 100644[m
+[1m--- a/User_Access_Control_Implementation_Guide.md[m
+[1m+++ b/User_Access_Control_Implementation_Guide.md[m
+[36m@@ -513,7 +513,7 @@[m [mModify RAGAnything and LightRAG core to accept metadata parameter.[m
+ [m
+ **Why**: Allow programmatic metadata assignment (not just through API).[m
+ [m
+[31m-**Files**: [m
+[32m+[m[32m**Files**:[m
+ - `raganything/processor.py`[m
+ - `LightRAG/lightrag/lightrag.py`[m
+ [m
+[36m@@ -547,7 +547,7 @@[m [moauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="login", auto_error=False[m
+ class CurrentUser:[m
+     """[m
+     Container for current user information extracted from JWT token[m
+[31m-    [m
+[32m+[m
+     Attributes:[m
+         username: Username from token[m
+         user_id: Unique user identifier (from metadata or username)[m
+[36m@@ -555,7 +555,7 @@[m [mclass CurrentUser:[m
+         metadata: Additional metadata from token[m
+         is_authenticated: Whether user has valid authentication[m
+     """[m
+[31m-    [m
+[32m+[m
+     def __init__([m
+         self,[m
+         username: Optional[str] = None,[m
+[36m@@ -569,19 +569,19 @@[m [mclass CurrentUser:[m
+         self.role = role[m
+         self.metadata = metadata or {}[m
+         self.is_authenticated = is_authenticated[m
+[31m-    [m
+[32m+[m
+     def has_role(self, role: str) -> bool:[m
+         """[m
+         Check if user has a specific role[m
+[31m-        [m
+[32m+[m
+         Args:[m
+             role: Role name to check[m
+[31m-            [m
+[32m+[m
+         Returns:[m
+             True if user has the role[m
+         """[m
+         return self.role == role or role in self.metadata.get("roles", [])[m
+[31m-    [m
+[32m+[m
+     def __repr__(self):[m
+         return f"CurrentUser(user_id={self.user_id}, role={self.role}, authenticated={self.is_authenticated})"[m
+ [m
+[36m@@ -591,17 +591,17 @@[m [masync def get_current_user_optional([m
+ ) -> CurrentUser:[m
+     """[m
+     Extract user information from JWT token (OPTIONAL - doesn't fail if no token)[m
+[31m-    [m
+[32m+[m
+     This function is used as a FastAPI dependency to extract user information[m
+     from the JWT token in the Authorization header. If no token is provided[m
+     or the token is invalid, returns an unauthenticated guest user.[m
+[31m-    [m
+[32m+[m
+     Args:[m
+         token: JWT token from Authorization header (automatically extracted)[m
+[31m-        [m
+[32m+[m
+     Returns:[m
+         CurrentUser object (may be unauthenticated)[m
+[31m-        [m
+[32m+[m
+     Example:[m
+         @router.post("/endpoint")[m
+         async def endpoint(current_user: CurrentUser = Depends(get_current_user_optional)):[m
+[36m@@ -613,11 +613,11 @@[m [masync def get_current_user_optional([m
+     # No token provided - unauthenticated user[m
+     if not token:[m
+         return CurrentUser(is_authenticated=False, role="guest")[m
+[31m-    [m
+[32m+[m
+     try:[m
+         # Use existing auth_handler to validate token[m
+         token_info = auth_handler.validate_token(token)[m
+[31m-        [m
+[32m+[m
+         # Extract user information from token[m
+         # token_info = {"username": str, "role": str, "metadata": dict, "exp": datetime}[m
+         return CurrentUser([m
+[36m@@ -627,7 +627,7 @@[m [masync def get_current_user_optional([m
+             metadata=token_info.get("metadata", {}),[m
+             is_authenticated=True[m
+         )[m
+[31m-        [m
+[32m+[m
+     except Exception:[m
+         # Invalid token - treat as unauthenticated (don't raise error for optional auth)[m
+         return CurrentUser(is_authenticated=False, role="guest")[m
+[36m@@ -638,19 +638,19 @@[m [masync def get_current_user_required([m
+ ) -> CurrentUser:[m
+     """[m
+     Extract user information from JWT token (REQUIRED - fails if no valid token)[m
+[31m-    [m
+[32m+[m
+     This function is used as a FastAPI dependency for endpoints that require[m
+     authentication. Raises 401 Unauthorized if no token or invalid token.[m
+[31m-    [m
+[32m+[m
+     Args:[m
+         token: JWT token from Authorization header (automatically extracted)[m
+[31m-        [m
+[32m+[m
+     Returns:[m
+         CurrentUser object (always authenticated)[m
+[31m-        [m
+[32m+[m
+     Raises:[m
+         HTTPException: 401 if no token or invalid token[m
+[31m-        [m
+[32m+[m
+     Example:[m
+         @router.post("/protected-endpoint")[m
+         async def endpoint(current_user: CurrentUser = Depends(get_current_user_required)):[m
+[36m@@ -662,10 +662,10 @@[m [masync def get_current_user_required([m
+             detail="Authentication required",[m
+             headers={"WWW-Authenticate": "Bearer"},[m
+         )[m
+[31m-    [m
+[32m+[m
+     # Validate token (will raise HTTPException if invalid)[m
+     token_info = auth_handler.validate_token(token)[m
+[31m-    [m
+[32m+[m
+     # Extract user information[m
+     return CurrentUser([m
+         username=token_info.get("username"),[m
+[36m@@ -685,24 +685,24 @@[m [masync def get_user_accessible_files([m
+ ) -> list[str]:[m
+     """[m
+     Get list of file_paths that user can access based on access control[m
+[31m-    [m
+[32m+[m
+     This function filters documents based on:[m
+     - Ownership (user owns the document)[m
+     - Access control lists (user is in viewers or editors)[m
+     - Role-based access (user has required role)[m
+     - Public access (document is marked as public)[m
+     - Project scoping (optional filter by project)[m
+[31m-    [m
+[32m+[m
+     Args:[m
+         doc_status_storage: Document status storage instance[m
+         current_user: Current user from JWT token (may be unauthenticated)[m
+         project_id: Optional project ID to filter documents[m
+         include_shared: Include documents shared with user (default: True)[m
+         include_public: Include public documents (default: True)[m
+[31m-        [m
+[32m+[m
+     Returns:[m
+         List of file_path strings user has access to[m
+[31m-        [m
+[32m+[m
+     Example:[m
+         accessible_files = await get_user_accessible_files([m
+             rag.doc_status,[m
+[36m@@ -715,54 +715,54 @@[m [masync def get_user_accessible_files([m
+     """[m
+     # Get all processed documents[m
+     all_docs = await doc_status_storage.get_docs_by_status(DocStatus.PROCESSED)[m
+[31m-    [m
+[32m+[m
+     accessible_files = [][m
+[31m-    [m
+[32m+[m
+     for doc_id, doc_status in all_docs.items():[m
+         metadata = doc_status.metadata[m
+[31m-        [m
+[32m+[m
+         # Check if document is public (no access control)[m
+         is_public = metadata.get("is_public", False)[m
+[31m-        [m
+[32m+[m
+         # Unauthenticated users can only see public documents[m
+         if not current_user.is_authenticated:[m
+             if is_public and include_public:[m
+                 accessible_files.append(doc_status.file_path)[m
+             continue[m
+[31m-        [m
+[32m+[m
+         # Authenticated user access checks[m
+         user_id = current_user.user_id[m
+[31m-        [m
+[32m+[m
+         # Check ownership[m
+         is_owner = metadata.get("user_id") == user_id[m
+[31m-        [m
+[32m+[m
+         # Check access control list[m
+         access_control = metadata.get("access_control", {})[m
+         is_viewer = user_id in access_control.get("viewers", [])[m
+         is_editor = user_id in access_control.get("editors", [])[m
+[31m-        [m
+[32m+[m
+         # Check role-based access[m
+         allowed_roles = metadata.get("allowed_roles", [])[m
+         has_role_access = any([m
+             current_user.has_role(role) for role in allowed_roles[m
+         ) if allowed_roles else False[m
+[31m-        [m
+[32m+[m
+         # Determine if user has access[m
+         has_access = ([m
+[31m-            is_owner or [m
+[32m+[m[32m            is_owner or[m
+             (include_shared and (is_viewer or is_editor)) or[m
+             has_role_access or[m
+             (is_public and include_public)[m
+         )[m
+[31m-        [m
+[32m+[m
+         # Apply project scoping (if specified)[m
+         if project_id:[m
+             in_project = metadata.get("project_id") == project_id[m
+             has_access = has_access and in_project[m
+[31m-        [m
+[32m+[m
+         if has_access:[m
+             accessible_files.append(doc_status.file_path)[m
+[31m-    [m
+[32m+[m
+     return accessible_files[m
+ [m
+ [m
+[36m@@ -772,17 +772,17 @@[m [masync def filter_chunks_by_access([m
+ ) -> list[dict]:[m
+     """[m
+     Filter chunks to only those from accessible files[m
+[31m-    [m
+[32m+[m
+     Args:[m
+         chunks: List of chunk dictionaries with file_path field[m
+         accessible_files: List of file_path strings user can access[m
+[31m-        [m
+[32m+[m
+     Returns:[m
+         Filtered list of chunks[m
+     """[m
+     return [[m
+         chunk for chunk in chunks[m
+[31m-        if any(accessible_file in chunk.get("file_path", "") [m
+[32m+[m[32m        if any(accessible_file in chunk.get("file_path", "")[m
+                for accessible_file in accessible_files)[m
+     ][m
+ [m
+[36m@@ -793,15 +793,15 @@[m [masync def filter_entities_by_access([m
+ ) -> list[dict]:[m
+     """[m
+     Filter entities to only those from accessible files[m
+[31m-    [m
+[32m+[m
+     Entities can have multiple file_paths (when entity appears in multiple documents)[m
+     separated by GRAPH_FIELD_SEP ("<SEP>"). An entity is accessible if ANY of its[m
+     file_paths are accessible.[m
+[31m-    [m
+[32m+[m
+     Args:[m
+         entities: List of entity dictionaries with file_path field[m
+         accessible_files: List of file_path strings user can access[m
+[31m-        [m
+[32m+[m
+     Returns:[m
+         Filtered list of entities[m
+     """[m
+[36m@@ -809,13 +809,13 @@[m [masync def filter_entities_by_access([m
+     for entity in entities:[m
+         # Entities can have multiple file_paths separated by <SEP>[m
+         entity_file_paths = entity.get("file_path", "").split(GRAPH_FIELD_SEP)[m
+[31m-        [m
+[32m+[m
+         # Check if ANY of the entity's file_paths are accessible[m
+[31m-        if any(accessible_file in fp [m
+[31m-               for fp in entity_file_paths [m
+[32m+[m[32m        if any(accessible_file in fp[m
+[32m+[m[32m               for fp in entity_file_paths[m
+                for accessible_file in accessible_files):[m
+             filtered.append(entity)[m
+[31m-    [m
+[32m+[m
+     return filtered[m
+ [m
+ [m
+[36m@@ -830,14 +830,14 @@[m [masync def query_with_access_control([m
+ ):[m
+     """[m
+     Execute RAG query with automatic access control filtering[m
+[31m-    [m
+[32m+[m
+     This is the main function for executing queries with access control.[m
+     It performs the following steps:[m
+     1. Get list of files user can access[m
+     2. Execute RAG query to get context[m
+     3. Filter results (chunks, entities, relationships) by access[m
+     4. Return filtered results[m
+[31m-    [m
+[32m+[m
+     Args:[m
+         rag: LightRAG instance[m
+         query: User's query string[m
+[36m@@ -846,10 +846,10 @@[m [masync def query_with_access_control([m
+         param: QueryParam object for query configuration[m
+         include_shared: Include documents shared with user[m
+         include_public: Include public documents[m
+[31m-        [m
+[32m+[m
+     Returns:[m
+         Filtered query results dictionary[m
+[31m-        [m
+[32m+[m
+     Example:[m
+         result = await query_with_access_control([m
+             rag=rag,[m
+[36m@@ -862,10 +862,10 @@[m [masync def query_with_access_control([m
+         )[m
+     """[m
+     from lightrag.base import QueryParam[m
+[31m-    [m
+[32m+[m
+     if param is None:[m
+         param = QueryParam()[m
+[31m-    [m
+[32m+[m
+     # Step 1: Get user's accessible files[m
+     accessible_files = await get_user_accessible_files([m
+         rag.doc_status,[m
+[36m@@ -874,7 +874,7 @@[m [masync def query_with_access_control([m
+         include_shared,[m
+         include_public[m
+     )[m
+[31m-    [m
+[32m+[m
+     # No accessible documents[m
+     if not accessible_files:[m
+         return {[m
+[36m@@ -889,12 +889,12 @@[m [masync def query_with_access_control([m
+                 "user_id": current_user.user_id if current_user.is_authenticated else None,[m
+             }[m
+         }[m
+[31m-    [m
+[32m+[m
+     # Step 2: Execute query with context retrieval[m
+     original_only_context = param.only_need_context[m
+     param.only_need_context = True[m
+     raw_result = await rag.aquery(query, param)[m
+[31m-    [m
+[32m+[m
+     # Step 3: Filter results by accessible files[m
+     if isinstance(raw_result, dict):[m
+         filtered_chunks = await filter_chunks_by_access([m
+[36m@@ -909,13 +909,13 @@[m [masync def query_with_access_control([m
+             raw_result.get("relationships", []),[m
+             accessible_files[m
+         )[m
+[31m-        [m
+[32m+[m
+         # If user wants full response (not just context), generate it with filtered context[m
+         if not original_only_context:[m
+             # TODO: Re-generate LLM response with filtered context[m
+             # For now, return filtered context[m
+             pass[m
+[31m-        [m
+[32m+[m
+         return {[m
+             "entities": filtered_entities,[m
+             "relationships": filtered_relationships,[m
+[36m@@ -931,7 +931,7 @@[m [masync def query_with_access_control([m
+                 "project_id": project_id,[m
+             }[m
+         }[m
+[31m-    [m
+[32m+[m
+     return raw_result[m
+ ```[m
+ [m
+[36m@@ -1251,25 +1251,25 @@[m [mcurl -X POST "http://localhost:8020/query" \[m
+     "user_id": str,                    # Owner user ID (from JWT token)[m
+     "uploaded_by": str,                # Username who uploaded[m
+     "upload_timestamp": str,           # ISO 8601 timestamp[m
+[31m-    [m
+[32m+[m
+     # Access Control[m
+     "access_control": {[m
+         "owner": str,                  # Owner user ID[m
+         "viewers": [str],              # List of user IDs with view access[m
+         "editors": [str],              # List of user IDs with edit access[m
+     },[m
+[31m-    [m
+[32m+[m
+     # Project and Organization[m
+     "project_id": str,                 # Project identifier[m
+     "tags": [str],                     # List of tags[m
+     "department": str,                 # Optional department[m
+[31m-    [m
+[32m+[m
+     # Public Access[m
+     "is_public": bool,                 # True if publicly accessible[m
+[31m-    [m
+[32m+[m
+     # Role-Based Access (optional)[m
+     "allowed_roles": [str],            # List of roles that can access[m
+[31m-    [m
+[32m+[m
+     # Custom Fields (optional)[m
+     "custom_field_1": Any,[m
+     "custom_field_2": Any,[m
+[36m@@ -1338,16 +1338,16 @@[m [mcurl -X POST "http://localhost:8020/query" \[m
+ [m
+ This implementation provides:[m
+ [m
+[31m-✅ **JWT-based authentication** using existing infrastructure  [m
+[31m-✅ **Optional authentication** - works with or without login  [m
+[31m-✅ **User access control** - ownership, sharing, viewers, editors  [m
+[31m-✅ **Project-based scoping** - organize documents into projects  [m
+[31m-✅ **Public documents** - allow unauthenticated access  [m
+[31m-✅ **Role-based access** - support for role-based permissions  [m
+[31m-✅ **Multimodal support** - all content types respect access control  [m
+[31m-✅ **Backward compatible** - existing documents continue to work  [m
+[31m-✅ **No schema changes** - uses existing metadata field  [m
+[31m-✅ **Minimal code changes** - leverages existing JWT infrastructure  [m
+[32m+[m[32m✅ **JWT-based authentication** using existing infrastructure[m
+[32m+[m[32m✅ **Optional authentication** - works with or without login[m
+[32m+[m[32m✅ **User access control** - ownership, sharing, viewers, editors[m
+[32m+[m[32m✅ **Project-based scoping** - organize documents into projects[m
+[32m+[m[32m✅ **Public documents** - allow unauthenticated access[m
+[32m+[m[32m✅ **Role-based access** - support for role-based permissions[m
+[32m+[m[32m✅ **Multimodal support** - all content types respect access control[m
+[32m+[m[32m✅ **Backward compatible** - existing documents continue to work[m
+[32m+[m[32m✅ **No schema changes** - uses existing metadata field[m
+[32m+[m[32m✅ **Minimal code changes** - leverages existing JWT infrastructure[m
+ [m
+ The implementation is **production-ready** and follows best practices for security and scalability.[m
+ [m
+[36m@@ -1363,4 +1363,3 @@[m [mThe implementation is **production-ready** and follows best practices for securi[m
+ 6. **Document** any customizations or extensions you make[m
+ [m
+ For questions or issues, refer to the LightRAG documentation or create an issue in the repository.[m
+[31m-[m
+[1mdiff --git a/examples/raganything_example.py b/examples/raganything_example.py[m
+[1mindex a89b70c..4490241 100644[m
+[1m--- a/examples/raganything_example.py[m
+[1m+++ b/examples/raganything_example.py[m
+[36m@@ -22,7 +22,13 @@[m [mimport sys[m
+ sys.path.append(str(Path(__file__).parent.parent))[m
+ [m
+ from lightrag.llm.openai import openai_complete_if_cache, openai_embed[m
+[31m-from lightrag.utils import EmbeddingFunc, logger, set_verbose_debug, get_log_format, get_detailed_log_format[m
+[32m+[m[32mfrom lightrag.utils import ([m
+[32m+[m[32m    EmbeddingFunc,[m
+[32m+[m[32m    logger,[m
+[32m+[m[32m    set_verbose_debug,[m
+[32m+[m[32m    get_log_format,[m
+[32m+[m[32m    get_detailed_log_format,[m
+[32m+[m[32m)[m
+ from raganything import RAGAnything, RAGAnythingConfig[m
+ [m
+ from dotenv import load_dotenv[m
+[1mdiff --git a/raganything/processor.py b/raganything/processor.py[m
+[1mindex ccc238c..27afb06 100644[m
+[1m--- a/raganything/processor.py[m
+[1m+++ b/raganything/processor.py[m
+[36m@@ -1563,17 +1563,21 @@[m [mclass ProcessorMixin:[m
+ [m
+             # Initialize doc status and retrieve metadata[m
+             current_doc_status = await self.lightrag.doc_status.get_by_id(doc_pre_id)[m
+[31m-            [m
+[32m+[m
+             # Retrieve metadata from doc_pre_id if not provided[m
+             if metadata is None and current_doc_status:[m
+                 metadata = current_doc_status.get("metadata", {})[m
+[31m-                self.logger.info(f"Retrieved metadata from doc-pre-* status: {metadata}")[m
+[32m+[m[32m                self.logger.info([m
+[32m+[m[32m                    f"Retrieved metadata from doc-pre-* status: {metadata}"[m
+[32m+[m[32m                )[m
+             elif metadata is None:[m
+                 metadata = {}[m
+[31m-                self.logger.info("No metadata provided and doc-pre-* not found, using empty metadata")[m
+[32m+[m[32m                self.logger.info([m
+[32m+[m[32m                    "No metadata provided and doc-pre-* not found, using empty metadata"[m
+[32m+[m[32m                )[m
+             else:[m
+                 self.logger.info(f"Using provided metadata: {metadata}")[m
+[31m-            [m
+[32m+[m
+             if not current_doc_status:[m
+                 await self.lightrag.doc_status.upsert([m
+                     {[m

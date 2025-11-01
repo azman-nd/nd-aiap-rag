@@ -137,12 +137,12 @@ class NanoVectorDBStorage(BaseVectorStorage):
             )
 
     async def query(
-        self, 
-        query: str, 
-        top_k: int, 
+        self,
+        query: str,
+        top_k: int,
         query_embedding: list[float] = None,
         filterby_ids: list[str] | None = None,
-        filter_type: Literal["chunk", "document"] | None = None
+        filter_type: Literal["chunk", "document"] | None = None,
     ) -> list[dict[str, Any]]:
         # Use provided embedding or compute it
         if query_embedding is not None:
@@ -160,9 +160,13 @@ class NanoVectorDBStorage(BaseVectorStorage):
         if filterby_ids:
             filter_set = set(filterby_ids)
             if filter_type == "document":
-                filter_lambda = lambda rec: bool(rec.get("full_doc_id") in filter_set)
+
+                def filter_lambda(rec):
+                    return bool(rec.get("full_doc_id") in filter_set)
             elif filter_type == "chunk":
-                filter_lambda = lambda rec: bool(rec.get("source_id") in filter_set)
+
+                def filter_lambda(rec):
+                    return bool(rec.get("source_id") in filter_set)
             else:
                 raise ValueError(f"Invalid filter type: {filter_type}")
 
@@ -170,9 +174,9 @@ class NanoVectorDBStorage(BaseVectorStorage):
             query=embedding,
             top_k=top_k,
             better_than_threshold=self.cosine_better_than_threshold,
-            filter_lambda=filter_lambda
+            filter_lambda=filter_lambda,
         )
-        
+
         results = [
             {
                 **{k: v for k, v in dp.items() if k != "vector"},

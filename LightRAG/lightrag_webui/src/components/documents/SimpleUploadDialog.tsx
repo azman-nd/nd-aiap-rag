@@ -50,15 +50,15 @@ export default function SimpleUploadDialog({ onDocumentsUploaded }: SimpleUpload
 
     try {
       const result = await uploadDocument(file, selectedScheme.id, undefined, metadata)
-      
+
       if (result.status === 'success') {
         toast.success(t('documentPanel.uploadDocuments.batch.success'))
-        
+
         // Refresh document list
         if (onDocumentsUploaded) {
           await onDocumentsUploaded()
         }
-        
+
         // Close dialog and reset form
         setOpen(false)
         setMetadata({
@@ -103,7 +103,7 @@ export default function SimpleUploadDialog({ onDocumentsUploaded }: SimpleUpload
           <UploadIcon /> {t('documentPanel.uploadDocuments.button')}
         </Button>
       </DialogTrigger>
-      
+
       <DialogContent className="sm:max-w-2xl" onCloseAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>{t('documentPanel.uploadDocuments.title')}</DialogTitle>
@@ -115,7 +115,7 @@ export default function SimpleUploadDialog({ onDocumentsUploaded }: SimpleUpload
             )}
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="space-y-6">
           {/* Metadata Form */}
           <div>
@@ -125,7 +125,7 @@ export default function SimpleUploadDialog({ onDocumentsUploaded }: SimpleUpload
               onChange={handleMetadataChange}
             />
           </div>
-          
+
           {/* File Upload */}
           <div>
             <h3 className="text-sm font-medium mb-3">{t('documentPanel.uploadDocuments.files.title')}</h3>
@@ -138,7 +138,7 @@ export default function SimpleUploadDialog({ onDocumentsUploaded }: SimpleUpload
                   </p>
                 </div>
                 <p className="text-sm text-yellow-700 mt-1">
-                  Please select a processing scheme (LightRAG or RAGAnything) before uploading files. 
+                  Please select a processing scheme (LightRAG or RAGAnything) before uploading files.
                   Look for the scheme manager button near the upload button.
                 </p>
               </div>

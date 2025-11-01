@@ -272,7 +272,7 @@ export default function RetrievalTesting() {
       // Always read filters fresh from store to avoid stale closures
       const graphFilters = state.graphMetadataFilters
       const graphFileFilter = state.graphFilePathFilter
-      
+
       // Always send access_filters to ensure consistent filtering
       // The backend will handle undefined/empty values appropriately
       queryParams.access_filters = {

@@ -32,7 +32,7 @@ const GraphFilterPanel: React.FC<GraphFilterPanelProps> = ({ className = '', dis
   const [isPublicFilter, setIsPublicFilter] = useState<boolean | null>(null)
   const [tags, setTags] = useState<MetadataTag[]>([])
   const [tagDraft, setTagDraft] = useState<MetadataTag>({ name: '', value: '' })
-  
+
   // UI state
   const [isExpanded, setIsExpanded] = useState(false)
   const [availableFiles, setAvailableFiles] = useState<string[]>([])
@@ -127,7 +127,7 @@ const GraphFilterPanel: React.FC<GraphFilterPanelProps> = ({ className = '', dis
       filename: selectedFilename || '(none)',
       tags: tags.length > 0 ? tags : '(none)'
     })
-    
+
     setGraphFilePathFilter(selectedFilename || null)
     updateGraphMetadataFilters({
       project_id: trimmedProjectId,  // Pass empty string, not undefined
@@ -144,21 +144,21 @@ const GraphFilterPanel: React.FC<GraphFilterPanelProps> = ({ className = '', dis
     setIsPublicFilter(null)
     setTags([])
     setTagDraft({ name: '', value: '' })
-    
+
     // Clear store state - must pass empty string, not undefined
     // because updateGraphMetadataFilters only updates when value !== undefined
     setGraphFilePathFilter(null)
-    updateGraphMetadataFilters({ 
+    updateGraphMetadataFilters({
       project_id: '',  // Empty string, not undefined
       owner: '',       // Empty string, not undefined
-      tags: [] 
+      tags: []
     })
-    
+
     // Close the panel
     setIsExpanded(false)
   }
 
-  const activeFilterCount = 
+  const activeFilterCount =
     (graphMetadataFilters.project_id && graphMetadataFilters.project_id.trim() ? 1 : 0) +
     (graphFilePathFilter ? 1 : 0) +
     (isPublicFilter !== null ? 1 : 0) +
@@ -269,7 +269,7 @@ const GraphFilterPanel: React.FC<GraphFilterPanelProps> = ({ className = '', dis
                 <Label className="text-xs font-medium">Visibility</Label>
                 <Select
                   value={isPublicFilter === null ? 'all' : isPublicFilter ? 'public' : 'private'}
-                  onValueChange={(value) => 
+                  onValueChange={(value) =>
                     setIsPublicFilter(value === 'all' ? null : value === 'public')
                   }
                 >
@@ -360,4 +360,3 @@ const GraphFilterPanel: React.FC<GraphFilterPanelProps> = ({ className = '', dis
 }
 
 export default GraphFilterPanel
-

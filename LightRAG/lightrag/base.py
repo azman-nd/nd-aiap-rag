@@ -216,12 +216,12 @@ class BaseVectorStorage(StorageNameSpace, ABC):
 
     @abstractmethod
     async def query(
-        self, 
-        query: str, 
-        top_k: int, 
+        self,
+        query: str,
+        top_k: int,
         query_embedding: list[float] = None,
         filterby_ids: list[str] | None = None,
-        filter_type: Literal["chunk", "document"] | None = None
+        filter_type: Literal["chunk", "document"] | None = None,
     ) -> list[dict[str, Any]]:
         """Query the vector storage and retrieve top_k results.
 
@@ -572,72 +572,68 @@ class BaseGraphStorage(StorageNameSpace, ABC):
         return all_edges
 
     async def get_nodes_by_chunk_ids_filtered(
-        self,
-        chunk_ids: list[str],
-        allowed_chunk_ids: set[str]
+        self, chunk_ids: list[str], allowed_chunk_ids: set[str]
     ) -> list[dict]:
         """Get nodes associated with chunk_ids, filtered by allowed_chunk_ids.
-        
+
         This method handles merged entities where source_id contains multiple chunk IDs
         separated by GRAPH_FIELD_SEP. A node is included if ANY of its chunk IDs are
         in the allowed_chunk_ids set.
-        
+
         Args:
             chunk_ids: List of chunk IDs from the query
             allowed_chunk_ids: Set of chunk IDs that are allowed (from allowed documents)
-            
+
         Returns:
             List of nodes that match the query AND are from allowed documents
         """
         all_nodes = await self.get_nodes_by_chunk_ids(chunk_ids)
-        
+
         filtered_nodes = []
         for node in all_nodes:
             source_id = node.get("source_id", "")
             if not source_id:
                 continue
-            
+
             # Split source_id by separator to handle merged entities
             node_chunk_ids = set(source_id.split(GRAPH_FIELD_SEP))
-            
+
             # Include if ANY chunk ID matches the query AND is allowed
             if node_chunk_ids & set(chunk_ids) and node_chunk_ids & allowed_chunk_ids:
                 filtered_nodes.append(node)
-        
+
         return filtered_nodes
 
     async def get_edges_by_chunk_ids_filtered(
-        self,
-        chunk_ids: list[str],
-        allowed_chunk_ids: set[str]
+        self, chunk_ids: list[str], allowed_chunk_ids: set[str]
     ) -> list[dict]:
         """Get edges associated with chunk_ids, filtered by allowed_chunk_ids.
-        
+
         This method handles merged relationships where source_id contains multiple chunk IDs.
         An edge is included if ANY of its chunk IDs are in the allowed_chunk_ids set.
-        
+
         Args:
             chunk_ids: List of chunk IDs from the query
             allowed_chunk_ids: Set of chunk IDs that are allowed (from allowed documents)
-            
+
         Returns:
             List of edges that match the query AND are from allowed documents
         """
         all_edges = await self.get_edges_by_chunk_ids(chunk_ids)
-        
+
         filtered_edges = []
         for edge in all_edges:
             source_id = edge.get("source_id", "")
             if not source_id:
                 continue
-            
+
             # Split source_id by separator to handle merged relations
             edge_chunk_ids = set(source_id.split(GRAPH_FIELD_SEP))
-            
+
             # Include if ANY chunk ID matches the query AND is allowed
             if edge_chunk_ids & set(chunk_ids) and edge_chunk_ids & allowed_chunk_ids:
                 filtered_edges.append(edge)
-        
+
         return filtered_edges
 
     @abstractmethod

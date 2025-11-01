@@ -1110,9 +1110,7 @@ class LightRAG:
         file_paths: str | list[str] | None = None,
         track_id: str | None = None,
         scheme_name: str | None = None,
-        metadata: dict[str, Any]
-        | list[dict[str, Any]]
-        | None = None,
+        metadata: dict[str, Any] | list[dict[str, Any]] | None = None,
     ) -> str:
         """
         Pipeline for Processing Documents
@@ -1883,30 +1881,36 @@ class LightRAG:
                                 current_doc_status = await self.doc_status.get_by_id(
                                     doc_id
                                 )
-                                
+
                                 # Get nodes and edges counts for this document
                                 nodes_count = 0
                                 edges_count = 0
                                 try:
                                     if self.full_entities:
-                                        entities_data = await self.full_entities.get_by_id(doc_id)
+                                        entities_data = (
+                                            await self.full_entities.get_by_id(doc_id)
+                                        )
                                         if entities_data:
                                             nodes_count = entities_data.get("count", 0)
-                                    
+
                                     if self.full_relations:
-                                        relations_data = await self.full_relations.get_by_id(doc_id)
+                                        relations_data = (
+                                            await self.full_relations.get_by_id(doc_id)
+                                        )
                                         if relations_data:
                                             edges_count = relations_data.get("count", 0)
                                 except Exception as e:
-                                    logger.warning(f"Could not retrieve graph counts for {doc_id}: {e}")
-                                
+                                    logger.warning(
+                                        f"Could not retrieve graph counts for {doc_id}: {e}"
+                                    )
+
                                 # Update metadata with graph counts
                                 updated_metadata = {
                                     **(current_doc_status.get("metadata") or {}),
                                     "nodes_count": nodes_count,
                                     "edges_count": edges_count,
                                 }
-                                
+
                                 await self.doc_status.upsert(
                                     {
                                         doc_id: {
@@ -2730,7 +2734,7 @@ class LightRAG:
                         f"Deleting {doc_id} {file_path}(previous status: FAILED)"
                     )
                 else:
-                    warning_msg = f"Deleting {doc_id} {file_path}(previous status: {doc_status.value})"
+                    warning_msg = f"Deleting {doc_id} {file_path}(previous status: {doc_status})"
                 logger.info(warning_msg)
                 # Update pipeline status for monitoring
                 async with pipeline_status_lock:

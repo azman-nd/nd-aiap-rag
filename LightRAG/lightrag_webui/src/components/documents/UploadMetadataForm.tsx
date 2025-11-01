@@ -40,10 +40,10 @@ interface UploadMetadataFormProps {
   className?: string
 }
 
-export default function UploadMetadataForm({ 
-  metadata, 
-  onChange, 
-  className 
+export default function UploadMetadataForm({
+  metadata,
+  onChange,
+  className
 }: UploadMetadataFormProps) {
   const { t } = useTranslation()
   const [newTag, setNewTag] = useState<TagFormValue>({ name: '', value: '' })

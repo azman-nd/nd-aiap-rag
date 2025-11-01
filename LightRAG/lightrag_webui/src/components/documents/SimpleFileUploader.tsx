@@ -52,9 +52,9 @@ export default function SimpleFileUploader({
   const handleFileSelect = useCallback((files: File[]) => {
     console.log('SimpleFileUploader: Files selected:', files.length)
     setError(null)
-    
+
     const newFiles: FileWithStatus[] = []
-    
+
     for (const file of files) {
       const validationError = validateFile(file)
       if (validationError) {
@@ -139,7 +139,7 @@ export default function SimpleFileUploader({
         console.log(`SimpleFileUploader: Uploading file ${i + 1}/${filesToUpload.length}:`, fileWithStatus.file.name)
         await onUpload(fileWithStatus.file, {})
         console.log('SimpleFileUploader: Upload successful for', fileWithStatus.file.name)
-        
+
         // Update status to success
         setSelectedFiles(prev => {
           const updated = [...prev]
@@ -149,7 +149,7 @@ export default function SimpleFileUploader({
       } catch (err) {
         console.error('SimpleFileUploader: Upload failed for', fileWithStatus.file.name, err)
         const errorMessage = err instanceof Error ? err.message : 'Upload failed'
-        
+
         // Update status to error
         setSelectedFiles(prev => {
           const updated = [...prev]
@@ -227,13 +227,13 @@ export default function SimpleFileUploader({
           disabled={disabled || uploading}
           multiple={multiple}
         />
-        
+
         <div className="flex flex-col items-center gap-2">
           <Upload className="h-8 w-8 text-muted-foreground" />
           <div>
             <p className="text-sm font-medium">
-              {dragActive 
-                ? `Drop file${multiple ? 's' : ''} here` 
+              {dragActive
+                ? `Drop file${multiple ? 's' : ''} here`
                 : `Click to upload or drag and drop${multiple ? ' (multiple files supported)' : ''}`}
             </p>
             <p className="text-xs text-muted-foreground">
@@ -325,8 +325,8 @@ export default function SimpleFileUploader({
           disabled={disabled || uploading}
           className="w-full"
         >
-          {uploading 
-            ? `Uploading ${uploadingCount} of ${pendingCount} file${pendingCount > 1 ? 's' : ''}...` 
+          {uploading
+            ? `Uploading ${uploadingCount} of ${pendingCount} file${pendingCount > 1 ? 's' : ''}...`
             : `Upload ${pendingCount} File${pendingCount > 1 ? 's' : ''}`}
         </Button>
       )}
